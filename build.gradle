@@ -1,0 +1,55 @@
+subprojects {
+	
+	apply plugin: 'java'
+	
+	it.group = 'com.resonance'
+	it.version = '1.0'
+	
+	
+	java {
+		toolchain {
+			languageVersion = JavaLanguageVersion.of(21)
+		}
+	}
+	
+	repositories {
+		mavenCentral()
+	}
+	
+	dependencies {
+		
+		// json library
+		implementation 'com.google.code.gson:gson:2.11.0'
+		
+		
+		implementation 'com.google.guava:guava:30.0-jre'
+		
+		//unit testing
+		testImplementation platform('org.junit:junit-bom:5.10.0')
+		testImplementation 'org.junit.jupiter:junit-jupiter'
+		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	}
+	
+	//junit testing
+	test {
+		useJUnitPlatform()
+	}
+	
+	//ensure utf-8 encoding
+	tasks.withType(JavaCompile).tap {
+		configureEach {
+			options.encoding = "UTF-8"
+		}
+	}
+	
+	//run in separate directory
+	tasks.withType(JavaExec).tap {
+		configureEach {
+			if (it.getName().equalsIgnoreCase("run")) {
+				final File file = new File(projectDir, "run")
+				file.mkdirs()
+				workingDir = file
+			}
+		}
+	}
+}

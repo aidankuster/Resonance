@@ -1,0 +1,11 @@
+plugins {
+	id "application"
+}
+
+application {
+	mainClass.set("com.resonance.server.Main")
+}
+
+dependencies {
+
+}
