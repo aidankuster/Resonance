@@ -1,5 +1,7 @@
 package com.resonance.server.database;
 
+import org.jooq.SQLDialect;
+
 /**
  * Configuration for the SQL database
  *
@@ -7,7 +9,7 @@ package com.resonance.server.database;
  */
 public class DatabaseConfig {
 	
-	public String driver = "mysql";
+	public SQLDialect dialect = SQLDialect.MYSQL;
 	public String host = "localhost";
 	public int port = 3306;
 	public String username = "root";
