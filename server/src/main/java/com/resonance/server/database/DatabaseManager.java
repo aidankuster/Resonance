@@ -111,14 +111,24 @@ public class DatabaseManager implements AutoCloseable {
 		
 		final int genresTable = dsl.createTableIfNotExists("genres")
 				.column("id", SQLDataType.INTEGER.identity(true))
+				.column("tag_id", SQLDataType.INTEGER.notNull())
 				.column("name", SQLDataType.VARCHAR(128))
-				.primaryKey("id")
+				.constraints(
+					   primaryKey("id"),
+					   constraint("fk_genre_tag_id")
+							   .foreignKey("tag_id")
+							   .references("tags", "id"))
 				.execute();
 		
 		final int instrumentsTable = dsl.createTableIfNotExists("instruments")
 				.column("id", SQLDataType.INTEGER.identity(true))
+				.column("tag_id", SQLDataType.INTEGER.notNull())
 				.column("name", SQLDataType.VARCHAR(128))
-				.primaryKey("id")
+				.constraints(
+						primaryKey("id"),
+						constraint("fk_instrument_tag_id")
+								.foreignKey("tag_id")
+								.references("tags", "id"))
 				.execute();
 		
 		return userAccountTable
