@@ -71,6 +71,7 @@ public class DatabaseManager implements AutoCloseable {
 				.column("email_address", SQLDataType.VARCHAR(255))
 				.column("password", SQLDataType.VARCHAR(255))
 				.column("enabled", SQLDataType.BOOLEAN.defaultValue(true))
+				.column("admin", SQLDataType.BOOLEAN.defaultValue(false))
 				.primaryKey("id")
 				.execute();
 		
@@ -108,6 +109,23 @@ public class DatabaseManager implements AutoCloseable {
 								.references("tags", "id"))
 				.execute();
 		
-		return userAccountTable + userAccountInfoTable + tagsTable + userAccountTagsTable > 0;
+		final int genresTable = dsl.createTableIfNotExists("genres")
+				.column("id", SQLDataType.INTEGER.identity(true))
+				.column("name", SQLDataType.VARCHAR(128))
+				.primaryKey("id")
+				.execute();
+		
+		final int instrumentsTable = dsl.createTableIfNotExists("instruments")
+				.column("id", SQLDataType.INTEGER.identity(true))
+				.column("name", SQLDataType.VARCHAR(128))
+				.primaryKey("id")
+				.execute();
+		
+		return userAccountTable
+				+ userAccountInfoTable
+				+ tagsTable
+				+ userAccountTagsTable
+				+ genresTable
+				+ instrumentsTable > 0;
 	}
 }

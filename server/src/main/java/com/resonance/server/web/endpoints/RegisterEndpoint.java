@@ -19,6 +19,11 @@ public class RegisterEndpoint implements EndpointGroup {
 	}
 	
 	private void handle(@NotNull Context ctx) {
-	
+		final String username = ctx.formParam("username");
+		final String email = ctx.formParam("email");
+		final String password = ctx.formParam("password");
+		final String confirmPassword = ctx.formParam("password2");
+		
+		
 	}
 }
