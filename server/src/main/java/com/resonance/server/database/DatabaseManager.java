@@ -61,7 +61,6 @@ public class DatabaseManager implements AutoCloseable {
 		this.connection.close();
 	}
 	
-	
 	private boolean initializeDefaultTables() {
 		final DSLContext dsl = DSL.using(this.connection, this.config.dialect);
 		
