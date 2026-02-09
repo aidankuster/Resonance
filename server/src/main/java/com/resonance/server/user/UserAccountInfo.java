@@ -3,7 +3,7 @@ package com.resonance.server.user;
 /**
  * @author John 2/4/2026
  */
-public record UserAccountInfo(String firstName, String middleName, String lastName, String bio) {
+public record UserAccountInfo(String displayName, String bio) {
 	
 	public Mutable mutable() {
 		return new Mutable(this);
@@ -11,40 +11,20 @@ public record UserAccountInfo(String firstName, String middleName, String lastNa
 	
 	public static class Mutable {
 		
-		private String firstName;
-		private String middleName;
-		private String lastName;
+		private String displayName;
 		private String bio;
 		
 		public Mutable(UserAccountInfo accountInfo) {
-			this.firstName = accountInfo.firstName();
-			this.middleName = accountInfo.middleName();
-			this.lastName = accountInfo.lastName();
+			this.displayName = accountInfo.displayName;
 			this.bio = accountInfo.bio();
 		}
 		
-		public String getFirstName() {
-			return this.firstName;
+		public String getDisplayName() {
+			return this.displayName;
 		}
 		
-		public void setFirstName(String firstName) {
-			this.firstName = firstName;
-		}
-		
-		public String getMiddleName() {
-			return this.middleName;
-		}
-		
-		public void setMiddleName(String middleName) {
-			this.middleName = middleName;
-		}
-		
-		public String getLastName() {
-			return this.lastName;
-		}
-		
-		public void setLastName(String lastName) {
-			this.lastName = lastName;
+		public void setDisplayName(String lastName) {
+			this.displayName = lastName;
 		}
 		
 		public String getBio() {

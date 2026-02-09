@@ -3,7 +3,7 @@ package com.resonance.server.user;
 /**
  * @author John 2/4/2026
  */
-public record UserAccount(int id, String username, String emailAddress, String hashedPassword, boolean enabled, boolean admin, UserAccountInfo info) {
+public record UserAccount(int id, String emailAddress, String hashedPassword, boolean enabled, boolean admin, UserAccountInfo info) {
 	
 	public Mutable mutable() {
 		return new Mutable(this);
@@ -12,7 +12,6 @@ public record UserAccount(int id, String username, String emailAddress, String h
 	public static class Mutable {
 		
 		private final int id;
-		private String username;
 		private String emailAddress;
 		private String hashedPassword;
 		private boolean enabled;
@@ -21,7 +20,6 @@ public record UserAccount(int id, String username, String emailAddress, String h
 		
 		public Mutable(UserAccount user) {
 			this.id = user.id();
-			this.username = user.username();
 			this.emailAddress = user.emailAddress();
 			this.hashedPassword = user.hashedPassword();
 			this.enabled = user.enabled();
@@ -32,14 +30,6 @@ public record UserAccount(int id, String username, String emailAddress, String h
 		
 		public int getID() {
 			return this.id;
-		}
-		
-		public String getUsername() {
-			return this.username;
-		}
-		
-		public void setUsername(String username) {
-			this.username = username;
 		}
 		
 		public String getEmailAddress() {

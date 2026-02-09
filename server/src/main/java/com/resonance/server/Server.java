@@ -60,5 +60,12 @@ public class Server {
 		this.webServer = new WebServer();
 	}
 	
+	public DatabaseManager getDatabaseManager() {
+		return this.databaseManager;
+	}
+	
+	public  WebServer getWebServer() {
+		return this.webServer;
+	}
 
 }
