@@ -1,12 +1,13 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
 	id "application"
+	id "com.gradleup.shadow" version "9.3.1"
 	id "org.flywaydb.flyway" version "11.20.0"
 	id "org.jooq.jooq-codegen-gradle" version "3.20.10"
 }
 
-application {
-	mainClass.set("com.resonance.server.Server")
-}
+final def reactAppPath = new File(this.rootProject.rootDir, "react-app").toPath()
 
 dependencies {
 	
@@ -31,3 +32,36 @@ dependencies {
 	implementation "com.password4j:password4j:1.8.4"
 	
 }
+
+application {
+	mainClass.set("com.resonance.server.Server")
+}
+
+//set working directory to 'run'
+this.tasks.withType(JavaExec).configureEach {
+	println("RUN: " + it.name + " " + it.class)
+	
+	workingDir = file("run")
+	doFirst {
+		file("run").mkdirs()
+	}
+}
+
+this.tasks.register("buildWeb", Exec) {
+	workingDir reactAppPath
+	
+	final String npmCommand = Os.isFamily(Os.FAMILY_WINDOWS) ? 'npm.cmd' : 'npm'
+	
+	commandLine npmCommand, 'install'
+	commandLine npmCommand, 'run', 'build'
+}
+
+shadowJar {
+	dependsOn(buildWeb)
+	
+	into("public")  {
+		from(reactAppPath.resolve("dist"))
+	}
+}
+
+this.build.dependsOn(this.shadowJar)

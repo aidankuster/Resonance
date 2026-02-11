@@ -4,11 +4,10 @@ import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.web.endpoints.RegisterEndpoint;
 import io.javalin.Javalin;
 import io.javalin.apibuilder.EndpointGroup;
+import io.javalin.http.staticfiles.Location;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static io.javalin.apibuilder.ApiBuilder.*;
 
 /**
  * @author John 1/26/2026
@@ -45,6 +44,12 @@ public class WebServer {
 			config.router.apiBuilder(() -> {
 				this.initializeEndpoints();
 				this.endpoints.forEach(EndpointGroup::addEndpoints);
+			});
+			
+			config.staticFiles.add(staticFiles -> {
+				staticFiles.hostedPath = "/";                   // change to host files on a subpath, like '/assets'
+				staticFiles.directory = "/public";              // the directory where your files are located
+				staticFiles.location = Location.CLASSPATH;      // Location.CLASSPATH (jar) or Location.EXTERNAL (file system)
 			});
 		});
 		
