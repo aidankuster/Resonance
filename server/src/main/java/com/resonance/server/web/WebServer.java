@@ -51,6 +51,8 @@ public class WebServer {
 				staticFiles.directory = "/public";              // the directory where your files are located
 				staticFiles.location = Location.CLASSPATH;      // Location.CLASSPATH (jar) or Location.EXTERNAL (file system)
 			});
+			
+			config.spaRoot.addFile("/", "/public/index.html");
 		});
 		
 		this.javalin.start(this.config.port);
