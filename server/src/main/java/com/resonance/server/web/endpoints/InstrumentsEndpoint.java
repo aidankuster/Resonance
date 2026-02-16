@@ -8,25 +8,26 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
-import static io.javalin.apibuilder.ApiBuilder.*;
+import static io.javalin.apibuilder.ApiBuilder.get;
+import static io.javalin.apibuilder.ApiBuilder.path;
 
 /**
  * @author John 2/16/2026
  */
-public class GenresEndpoint implements EndpointGroup {
+public class InstrumentsEndpoint implements EndpointGroup {
 	
 	@Override
 	public void addEndpoints() {
-		path("/api/genres", () -> {
+		path("/api/instruments", () -> {
 			get(this::handle);
 		});
 	}
 	
 	private void handle(@NotNull Context ctx) {
-		final List<String> genres = Server.INSTANCE.getDatabaseManager().getGenreList().collectList().block();
+		final List<String> instruments = Server.INSTANCE.getDatabaseManager().getInstrumentsList().collectList().block();
 		
 		final JsonArray array = new JsonArray();
-		for (String genre : genres) {
+		for (String genre : instruments) {
 			array.add(genre);
 		}
 		

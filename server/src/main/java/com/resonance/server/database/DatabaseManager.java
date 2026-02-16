@@ -126,12 +126,17 @@ public class DatabaseManager implements AutoCloseable {
 		});
 	}
 	
-	/*
 	public Flux<String> getGenreList() {
-		return Flux.from(this.dsl.selectFrom("genres"))
+		return Flux.from(this.dsl.selectFrom("genres")).map(
+				record -> record.get(field("name", String.class))
+		);
 	}
 	
-	 */
+	public Flux<String> getInstrumentsList() {
+		return Flux.from(this.dsl.selectFrom("instruments")).map(
+				record -> record.get(field("name", String.class))
+		);
+	}
 	
 	@Override
 	public void close() throws Exception {
