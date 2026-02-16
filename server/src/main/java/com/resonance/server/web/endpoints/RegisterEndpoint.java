@@ -27,7 +27,7 @@ public class RegisterEndpoint implements EndpointGroup {
 	
 	@Override
 	public void addEndpoints() {
-		path("/register", () -> {
+		path("/api/register", () -> {
 			post(this::handle);
 		});
 	}
@@ -60,6 +60,8 @@ public class RegisterEndpoint implements EndpointGroup {
 											  .getResult();
 		
 		Server.INSTANCE.getDatabaseManager().createAccount(email, hashedPassword, true, false).blockLast();
+		
+		
 		
 		ctx.result("success");
 		ctx.status(200);

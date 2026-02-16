@@ -1,5 +1,7 @@
 package com.resonance.server.user;
 
+import com.google.gson.JsonObject;
+
 /**
  * @author John 2/4/2026
  */
@@ -8,6 +10,13 @@ public record UserAccount(int id, String emailAddress, String hashedPassword, bo
 	public Mutable mutable() {
 		return new Mutable(this);
 	}
+	
+	/*
+	public JsonObject toJson() {
+	
+	}
+	
+	 */
 	
 	public static class Mutable {
 		

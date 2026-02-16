@@ -126,6 +126,13 @@ public class DatabaseManager implements AutoCloseable {
 		});
 	}
 	
+	/*
+	public Flux<String> getGenreList() {
+		return Flux.from(this.dsl.selectFrom("genres"))
+	}
+	
+	 */
+	
 	@Override
 	public void close() throws Exception {
 		this.connection.close();

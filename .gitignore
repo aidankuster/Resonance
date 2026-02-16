@@ -42,3 +42,7 @@ bin/
 ### runs ###
 /client/run/
 /server/run/
+
+## nodejs ###
+**/node_modules/
+**/dist/
