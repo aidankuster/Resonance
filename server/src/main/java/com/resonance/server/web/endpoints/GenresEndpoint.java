@@ -2,8 +2,10 @@ package com.resonance.server.web.endpoints;
 
 import com.google.gson.JsonArray;
 import com.resonance.server.Server;
+import com.resonance.server.data.tags.Genre;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.Context;
+import io.javalin.http.InternalServerErrorResponse;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -23,11 +25,15 @@ public class GenresEndpoint implements EndpointGroup {
 	}
 	
 	private void handle(@NotNull Context ctx) {
-		final List<String> genres = Server.INSTANCE.getDatabaseManager().getGenreList().collectList().block();
+		final List<Genre> genres = Server.INSTANCE.getDatabaseManager().getGenreList().collectList().block();
+		
+		if(genres == null) {
+			throw new InternalServerErrorResponse();
+		}
 		
 		final JsonArray array = new JsonArray();
-		for (String genre : genres) {
-			array.add(genre);
+		for (Genre genre : genres) {
+			array.add(genre.getName());
 		}
 		
 		ctx.result(array.toString());

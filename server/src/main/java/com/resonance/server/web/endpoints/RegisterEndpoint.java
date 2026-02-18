@@ -2,7 +2,7 @@ package com.resonance.server.web.endpoints;
 
 import com.password4j.Password;
 import com.resonance.server.Server;
-import com.resonance.server.user.UserAccount;
+import com.resonance.server.data.UserAccount;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.ConflictResponse;
@@ -50,7 +50,7 @@ public class RegisterEndpoint implements EndpointGroup {
 		}
 		
 		//check if account already exists
-		final UserAccount userAccount = Server.INSTANCE.getDatabaseManager().findAccount(email).blockFirst(Duration.ofSeconds(1));
+		final UserAccount userAccount = Server.INSTANCE.getDatabaseManager().findAccount(email).block();
 		if(userAccount != null) {
 			throw new ConflictResponse("Email address already in use");
 		}
@@ -59,11 +59,13 @@ public class RegisterEndpoint implements EndpointGroup {
 											  .withBcrypt()
 											  .getResult();
 		
-		Server.INSTANCE.getDatabaseManager().createAccount(email, hashedPassword, true, false).blockLast();
+		final UserAccount account = Server.INSTANCE.getDatabaseManager().createAccount(email, hashedPassword, true, false).block();
 		
+		if(account == null) {
+			throw new ConflictResponse("Email address already in use");
+		}
 		
-		
-		ctx.result("success");
+		ctx.json(account);
 		ctx.status(200);
 	}
 }
