@@ -56,13 +56,21 @@ this.tasks.register("buildWeb", Exec) {
 	
 	commandLine npmCommand, 'install'
 	commandLine npmCommand, 'run', 'build'
+	
+	
+	// Optional: Define inputs and outputs for incremental builds
+	inputs.files fileTree(reactAppPath.resolve("src"))
+	inputs.file reactAppPath.resolve("package.json")
+	inputs.file reactAppPath.resolve("tailwind.config.js")
+	inputs.file reactAppPath.resolve("postcss.config.js")
+	outputs.dir reactAppPath.resolve("dist")
 }
 
 shadowJar {
 	dependsOn(buildWeb)
 	
 	into("public")  {
-		from(reactAppPath.resolve("dist"))
+		from(buildWeb)
 	}
 }
 
