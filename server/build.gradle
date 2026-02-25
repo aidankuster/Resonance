@@ -48,6 +48,8 @@ this.tasks.withType(JavaExec).configureEach {
 }
 
 this.tasks.register("buildWeb", Exec) {
+	shouldRunAfter(classes)
+	
 	workingDir reactAppPath
 	
 	final String npmCommand = Os.isFamily(Os.FAMILY_WINDOWS) ? 'npm.cmd' : 'npm'

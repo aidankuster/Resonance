@@ -1,15 +1,23 @@
 package com.resonance.server.database;
 
 import com.resonance.server.config.ConfigHolder;
-import com.resonance.server.user.UserAccount;
-import com.resonance.server.user.UserAccountInfo;
+import com.resonance.server.data.UserAccount;
+import com.resonance.server.data.UserAccountInfo;
+import com.resonance.server.data.tags.Genre;
+import com.resonance.server.data.tags.Instrument;
+import com.resonance.server.data.tags.Tag;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.util.HashSet;
 
 import static org.jooq.impl.DSL.*;
 
@@ -61,8 +69,8 @@ public class DatabaseManager implements AutoCloseable {
 		
 	}
 	
-	public Flux<Integer> createAccount(String emailAddress, String hashedPassword, boolean enabled, boolean admin) {
-		return Flux.from(
+	public Mono<UserAccount> createAccount(String emailAddress, String hashedPassword, boolean enabled, boolean admin) {
+		return Mono.from(
 				this.dsl.insertInto(
 						table("user_account")
 				).columns(
@@ -76,7 +84,12 @@ public class DatabaseManager implements AutoCloseable {
 						DSL.inline(enabled, Boolean.class),
 						DSL.inline(admin, Boolean.class)
 				)
-		);
+		).flatMap((i) -> {
+			if(i > 0) {
+				return findAccount(emailAddress);
+			}
+			return null;
+		});
 	}
 	
 	public Flux<Integer> updateAccount(UserAccount account) {
@@ -103,39 +116,82 @@ public class DatabaseManager implements AutoCloseable {
 		);
 	}
 	
-	public Flux<UserAccount> findAccount(String email_address) {
-		
+	public Mono<UserAccount> findAccount(int id) {
+		return this.findAccount(field("account_id").eq(DSL.inline(id, SQLDataType.INTEGER))).next();
+	}
+	
+	public Mono<UserAccount> findAccount(String emailAddress) {
+		return this.findAccount(field("email_address").eq(DSL.inline(emailAddress))).next();
+	}
+	
+	public Flux<UserAccount> findAccount(Condition condition) {
+
 		return Flux.from(
 				this.dsl.selectFrom(
-						table("user_account").leftJoin(table("user_account_info"))
+						table("user_account")
+								.leftJoin(table("user_account_info"))
 								.using(field("account_id", Integer.class))
-				).where(
-						field("email_address").eq(DSL.inline(email_address))
-				)
-		).map(record -> {
-			final int id = record.get(field("account_id", SQLDataType.INTEGER));
-			final String email = record.get(field("email_address", SQLDataType.VARCHAR));
-			final String hashedPassword = record.get(field("password", SQLDataType.VARCHAR));
-			final boolean enabled = record.get(field("enabled", SQLDataType.BOOLEAN));
-			final boolean admin = record.get(field("admin", SQLDataType.BOOLEAN));
-			
-			final String displayName = record.get(field("display_name", SQLDataType.VARCHAR));
-			final String bio = record.get(field("bio", SQLDataType.VARCHAR));
-			
-			return new UserAccount(id, email, hashedPassword, enabled, admin, new UserAccountInfo(displayName, bio));
+								.leftJoin(table("user_account_tags"))
+								.using(field("account_id", Integer.class))
+								.leftJoin(table("tags"))
+								.using(field("tag_id", Integer.class))
+				).where(condition)
+		).collectList().flatMapMany(records -> {
+			if(records.isEmpty()) {
+				return Flux.empty();
+			}
+
+			final var first = records.getFirst();
+
+			final int id = first.get(field("account_id", SQLDataType.INTEGER));
+			final String email = first.get(field("email_address", SQLDataType.VARCHAR));
+			final String hashedPassword = first.get(field("password", SQLDataType.VARCHAR));
+			final boolean enabled = first.get(field("enabled", SQLDataType.BOOLEAN));
+			final boolean admin = first.get(field("admin", SQLDataType.BOOLEAN));
+
+			final String displayName = first.get(field("display_name", SQLDataType.VARCHAR));
+			final String bio = first.get(field("bio", SQLDataType.VARCHAR));
+
+			final HashSet<Tag> tags = new HashSet<>();
+			for(var record : records) {
+				final Integer tagID = record.get(field("tag_id", Integer.class));
+				final String tagName = record.get(field("name", SQLDataType.VARCHAR));
+				if(tagID != null && tagName != null) {
+					tags.add(new Tag(tagID, tagName));
+				}
+			}
+
+			return Flux.just(new UserAccount(
+					id,
+					email,
+					hashedPassword,
+					enabled,
+					admin,
+					new UserAccountInfo(displayName, bio),
+					tags.toArray(Tag[]::new)
+			));
 		});
 	}
 	
-	public Flux<String> getGenreList() {
-		return Flux.from(this.dsl.selectFrom("genres")).map(
-				record -> record.get(field("name", String.class))
+	
+
+	public Flux<Genre> getGenreList() {
+		return Flux.from(this.dsl.selectFrom("genres")).map(record -> {
+					final int genreID = record.get(field("genre_id", Integer.class));
+					final int tagID = record.get(field("tag_id", Integer.class));
+					final String name = record.get(field("name", SQLDataType.VARCHAR));
+					return new Genre(genreID, tagID, name);
+				}
 		);
 	}
 	
-	public Flux<String> getInstrumentsList() {
-		return Flux.from(this.dsl.selectFrom("instruments")).map(
-				record -> record.get(field("name", String.class))
-		);
+	public Flux<Instrument> getInstrumentsList() {
+		return Flux.from(this.dsl.selectFrom("instruments")).map(record -> {
+			final int instrumentID = record.get(field("instrument_id", Integer.class));
+			final int tagID = record.get(field("tag_id", Integer.class));
+			final String name = record.get(field("name", SQLDataType.VARCHAR));
+			return new Instrument(instrumentID, tagID, name);
+		});
 	}
 	
 	@Override
@@ -151,7 +207,10 @@ public class DatabaseManager implements AutoCloseable {
 										.column("password", SQLDataType.VARCHAR(255))
 										.column("enabled", SQLDataType.BOOLEAN.defaultValue(true))
 										.column("admin", SQLDataType.BOOLEAN.defaultValue(false))
-										.primaryKey("account_id")
+										.constraints(
+												primaryKey("account_id"),
+												constraint("uk_email").unique("email_address")
+										)
 										.execute();
 		
 		//account info table, this will hold extra data of the account

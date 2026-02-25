@@ -1,4 +1,7 @@
-package com.resonance.server.user;
+package com.resonance.server.data;
+
+import com.google.gson.JsonObject;
+import com.resonance.server.config.ConfigHolder;
 
 /**
  * @author John 2/4/2026
@@ -7,6 +10,10 @@ public record UserAccountInfo(String displayName, String bio) {
 	
 	public Mutable mutable() {
 		return new Mutable(this);
+	}
+	
+	public JsonObject toJson() {
+		return ConfigHolder.GSON.toJsonTree(this, UserAccountInfo.class).getAsJsonObject();
 	}
 	
 	public static class Mutable {
