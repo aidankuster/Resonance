@@ -32,7 +32,7 @@ function App() {
             Moore Hall
           </a>
         </div>
-        <Link to="/create-profile">
+        <Link to="/userinitiation">
           <button className="bg-amber-600 hover:bg-yellow-700 px-6 py-2 rounded-full font-semibold transition">
             Get Started
           </button>
@@ -88,7 +88,7 @@ function App() {
             <h3 className="text-2xl font-bold mb-4">Verified Students</h3>
             <p className="text-gray-300">
               Connect exclusively with verified UNCP music students. Build your
-              network with diligent musicians.
+              network and create new opportunities.
             </p>
           </div>
 
@@ -98,8 +98,8 @@ function App() {
             </div>
             <h3 className="text-2xl font-bold mb-4">Smart Matching</h3>
             <p className="text-gray-300">
-              Our algorithm suggests perfect matches based on instrument, skill
-              level, genre preferences, and availability.
+              An algorithm that suggests perfect matches based on instrument,
+              skill level, and genre preferences.
             </p>
           </div>
 
@@ -110,7 +110,7 @@ function App() {
             <h3 className="text-2xl font-bold mb-4">Performance Ready</h3>
             <p className="text-gray-300">
               From casual jam sessions to formal recitals. Find opportunities
-              that match your musical ambitions.
+              that match your musical goals.
             </p>
           </div>
         </div>
@@ -119,13 +119,13 @@ function App() {
       {/* CTA */}
       <section className="container mx-auto px-6 py-20 text-center">
         <h2 className="text-4xl font-bold mb-6">
-          Discover the Resonance Community
+          Join the Resonance Community!
         </h2>
         <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
           Join the Resonance community and find musicians at UNCP already
           creating amazing music together.
         </p>
-        <Link to="/create-profile">
+        <Link to="/userinitiation">
           <button className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 px-10 py-4 rounded-full text-lg font-bold transition transform hover:scale-105">
             Create Free Account
           </button>

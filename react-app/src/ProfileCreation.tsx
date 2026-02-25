@@ -22,27 +22,29 @@ function ProfileCreation() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [formData, setFormData] = useState({
-    // New account fields
+    // Account fields
     email: "",
     password: "",
     confirmPassword: "",
 
-    // Existing profile fields
+    // Profile fields
     displayName: "",
     bio: "",
-    primaryInstrument: "",
-    secondaryInstruments: [] as string[],
+    instruments: [] as string[],
     genres: [] as string[],
     experienceLevel: "",
     availability: "",
+    profilePicture: null as File | null, // profile picture
     audioSamples: [] as File[],
   });
 
   const [formErrors, setFormErrors] = useState({
-    username: "",
     email: "",
     password: "",
     confirmPassword: "",
+    instruments: "",
+    genres: "",
+    experienceLevel: "",
   });
 
   const instruments = [
@@ -96,7 +98,6 @@ function ProfileCreation() {
   };
 
   const validatePassword = (password: string) => {
-    // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
     return passwordRegex.test(password);
   };
@@ -111,13 +112,11 @@ function ProfileCreation() {
         );
       case 2:
         return (
-          formData.displayName.trim() !== "" &&
-          formData.primaryInstrument !== ""
+          formData.displayName.trim() !== "" && formData.instruments.length > 0
         );
       case 3:
         return formData.genres.length >= 1 && formData.experienceLevel !== "";
       case 4:
-        // Step 4 fields are optional
         return true;
       default:
         return false;
@@ -126,10 +125,12 @@ function ProfileCreation() {
 
   const validateCurrentStep = () => {
     const errors = {
-      username: "",
       email: "",
       password: "",
       confirmPassword: "",
+      instruments: "",
+      genres: "",
+      experienceLevel: "",
     };
 
     if (step === 1) {
@@ -153,13 +154,27 @@ function ProfileCreation() {
       }
     }
 
+    if (step === 2) {
+      if (formData.instruments.length === 0) {
+        errors.instruments = "Please select at least one instrument";
+      }
+    }
+
+    if (step === 3) {
+      if (formData.genres.length === 0) {
+        errors.genres = "Please select at least one genre";
+      }
+      if (!formData.experienceLevel) {
+        errors.experienceLevel = "Please select your experience level";
+      }
+    }
+
     setFormErrors(errors);
     return Object.values(errors).every((error) => error === "");
   };
 
   const handleInputChange = (field: string, value: string | string[]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (formErrors[field as keyof typeof formErrors]) {
       setFormErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -175,6 +190,28 @@ function ProfileCreation() {
     }
   };
 
+  const handleProfilePictureUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        alert("Please upload an image file");
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image must be less than 5MB");
+        return;
+      }
+      setFormData((prev) => ({
+        ...prev,
+        profilePicture: file,
+      }));
+    }
+  };
+
   const removeAudioSample = (index: number) => {
     setFormData((prev) => ({
       ...prev,
@@ -185,8 +222,6 @@ function ProfileCreation() {
   const handleNextStep = () => {
     if (validateCurrentStep() && validateStep()) {
       setStep(step + 1);
-    } else {
-      alert("Please complete all required fields before continuing.");
     }
   };
 
@@ -197,12 +232,10 @@ function ProfileCreation() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Only allow submission on step 4
     if (step !== 4) {
       return;
     }
 
-    // Validate all steps before submitting
     if (!validateStep()) {
       alert("Please complete all required fields before submitting.");
       return;
@@ -211,31 +244,25 @@ function ProfileCreation() {
     setIsSubmitting(true);
 
     try {
-      // Create final form data object
       const finalFormData = {
         accountInfo: {
           email: formData.email,
-          // In a real app, you would hash the password before sending
         },
         profileInfo: {
           displayName: formData.displayName,
-          primaryInstrument: formData.primaryInstrument,
-          secondaryInstruments: formData.secondaryInstruments,
+          instruments: formData.instruments,
           genres: formData.genres,
           experienceLevel: formData.experienceLevel,
           bio: formData.bio,
           availability: formData.availability,
+          hasProfilePicture: !!formData.profilePicture,
           audioSampleCount: formData.audioSamples.length,
         },
         submittedAt: new Date().toISOString(),
       };
 
       console.log("Submitting Profile Data:", finalFormData);
-
-      // Simulate API call with delay
       await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Success - navigate to dashboard
       navigate("/dashboard");
     } catch (error) {
       console.error("Error creating profile:", error);
@@ -246,7 +273,6 @@ function ProfileCreation() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Prevent form submission on Enter key for steps 1-3
     if (e.key === "Enter" && step !== 4) {
       e.preventDefault();
       if (validateStep()) {
@@ -260,13 +286,6 @@ function ProfileCreation() {
       case 1:
         return (
           <div className="space-y-8">
-            <div>
-              <h3 className="text-2xl font-bold mb-2">Create Your Account</h3>
-              <p className="text-gray-400">
-                Set up your Resonance account with UNCP credentials
-              </p>
-            </div>
-
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -386,8 +405,12 @@ function ProfileCreation() {
         return (
           <div className="space-y-8">
             <div>
-              <h3 className="text-2xl font-bold mb-2">Basic Information</h3>
-              <p className="text-gray-400">Let's start with the essentials</p>
+              <h3 className="text-2xl font-bold mb-2">
+                Display Name and Instruments
+              </h3>
+              <p className="text-gray-400">
+                Set your display name and select all instruments that you play
+              </p>
             </div>
 
             <div className="space-y-6">
@@ -410,47 +433,24 @@ function ProfileCreation() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Primary Instrument *
+                  Instruments You Play *
                 </label>
-                <select
-                  value={formData.primaryInstrument}
-                  onChange={(e) =>
-                    handleInputChange("primaryInstrument", e.target.value)
-                  }
-                  onKeyDown={handleKeyDown}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500"
-                  required
-                >
-                  <option value="">Select your main instrument</option>
-                  {instruments.map((instr) => (
-                    <option key={instr} value={instr}>
-                      {instr}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Secondary Instruments
-                </label>
+                <p className="text-sm text-gray-500 mb-3">
+                  Select all that apply (at least one required)
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {instruments.map((instr) => (
                     <button
                       key={instr}
                       type="button"
                       onClick={() => {
-                        const updated = formData.secondaryInstruments.includes(
-                          instr,
-                        )
-                          ? formData.secondaryInstruments.filter(
-                              (i) => i !== instr,
-                            )
-                          : [...formData.secondaryInstruments, instr];
-                        handleInputChange("secondaryInstruments", updated);
+                        const updated = formData.instruments.includes(instr)
+                          ? formData.instruments.filter((i) => i !== instr)
+                          : [...formData.instruments, instr];
+                        handleInputChange("instruments", updated);
                       }}
                       className={`px-4 py-2 rounded-full transition ${
-                        formData.secondaryInstruments.includes(instr)
+                        formData.instruments.includes(instr)
                           ? "bg-amber-600 text-white"
                           : "bg-gray-800 hover:bg-gray-700"
                       }`}
@@ -459,6 +459,11 @@ function ProfileCreation() {
                     </button>
                   ))}
                 </div>
+                {formErrors.instruments && (
+                  <p className="text-sm text-red-400 mt-2">
+                    {formErrors.instruments}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -503,9 +508,9 @@ function ProfileCreation() {
                     </button>
                   ))}
                 </div>
-                {formData.genres.length === 0 && (
+                {formErrors.genres && (
                   <p className="text-sm text-red-400 mt-2">
-                    Please select at least one genre
+                    {formErrors.genres}
                   </p>
                 )}
               </div>
@@ -532,9 +537,9 @@ function ProfileCreation() {
                     </button>
                   ))}
                 </div>
-                {!formData.experienceLevel && (
+                {formErrors.experienceLevel && (
                   <p className="text-sm text-red-400 mt-2">
-                    Please select your experience level
+                    {formErrors.experienceLevel}
                   </p>
                 )}
               </div>
@@ -549,10 +554,10 @@ function ProfileCreation() {
                   onKeyDown={handleKeyDown}
                   className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 h-32 focus:outline-none focus:border-amber-500"
                   placeholder="Tell us about your musical journey, influences, and what you're looking for..."
-                  maxLength={500}
+                  maxLength={255}
                 />
                 <p className="text-sm text-gray-500 mt-2 text-right">
-                  {formData.bio.length}/500
+                  {formData.bio.length}/255
                 </p>
               </div>
             </div>
@@ -565,11 +570,73 @@ function ProfileCreation() {
             <div>
               <h3 className="text-2xl font-bold mb-2">Showcase Your Talent</h3>
               <p className="text-gray-400">
-                Upload audio samples (optional but recommended)
+                Add a profile picture and audio samples (optional but
+                recommended)
               </p>
             </div>
 
             <div className="space-y-6">
+              {/* Profile Picture Section */}
+              <div>
+                <label className="block text-sm font-medium mb-3">
+                  Profile Picture
+                </label>
+                <div className="flex items-center gap-6">
+                  <div className="relative">
+                    <div className="h-24 w-24 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-500/20 border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden">
+                      {formData.profilePicture ? (
+                        <img
+                          src={URL.createObjectURL(formData.profilePicture)}
+                          alt="Profile preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-10 w-10 text-gray-400" />
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        document.getElementById("profile-picture")?.click()
+                      }
+                      className="absolute -bottom-2 -right-2 bg-amber-600 hover:bg-amber-700 rounded-full p-2 transition"
+                    >
+                      <Upload className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-300 mb-1">
+                      Upload a profile photo
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      JPG, PNG, or GIF • Max 5MB • Square image recommended
+                    </p>
+                    <input
+                      type="file"
+                      id="profile-picture"
+                      accept="image/*"
+                      onChange={handleProfilePictureUpload}
+                      className="hidden"
+                    />
+                    {formData.profilePicture && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            profilePicture: null,
+                          }))
+                        }
+                        className="text-xs text-red-400 hover:text-red-300 mt-2"
+                      >
+                        Remove photo
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Audio Samples Section */}
               <div className="border-2 border-dashed border-gray-700 rounded-2xl p-8 text-center hover:border-amber-500 transition">
                 <input
                   type="file"
@@ -642,7 +709,6 @@ function ProfileCreation() {
                     handleInputChange("availability", e.target.value)
                   }
                   onKeyDown={(e) => {
-                    // Allow Enter in textarea but prevent form submission
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                     }
@@ -650,10 +716,14 @@ function ProfileCreation() {
                   className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500"
                   placeholder="e.g., 'Available for jam sessions on weekends', 'Looking for weekly rehearsals'"
                   rows={3}
+                  maxLength={255}
                 />
-                <p className="text-sm text-gray-500 mt-2">
-                  Let others know when you're available to collaborate
-                </p>
+                <div className="flex justify-between items-center text-sm text-gray-500 mt-2">
+                  <span>
+                    Let others know when you're available to collaborate
+                  </span>
+                  <span>{formData.availability.length}/255</span>
+                </div>
               </div>
             </div>
           </div>
@@ -758,111 +828,105 @@ function ProfileCreation() {
                     isSubmitting ? "opacity-70 cursor-not-allowed" : ""
                   }`}
                 >
-                  {isSubmitting ? "Creating Profile..." : "Complete Profile"}
+                  {isSubmitting ? "Completing Profile..." : "Complete Profile"}
                 </button>
               )}
             </div>
           </div>
         </div>
 
-        {/* Account & Profile Preview */}
+        {/* Profile Preview */}
         <div className="mt-12 bg-gray-900/30 rounded-2xl p-6 border border-gray-800">
           <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
             <User className="h-5 w-5" />
-            {step === 1 ? "Account Preview" : "Profile Preview"}
+            Profile Preview
           </h3>
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              {step >= 1 && (
-                <div className="bg-gray-800 rounded-xl p-4 mb-4">
-                  <h4 className="font-semibold mb-2">Basic Info</h4>
-                  <p className="text-amber-400">
-                    {formData.displayName || "Your Name"}
-                  </p>
-                  <p className="text-gray-400">
-                    {formData.primaryInstrument || "Primary Instrument"}
-                  </p>
-                  {formData.secondaryInstruments.length > 0 && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Also plays: {formData.secondaryInstruments.join(", ")}
+              <div className="bg-gray-800 rounded-xl p-4 mb-4">
+                <h4 className="font-semibold mb-2">Basic Info</h4>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-500/20 flex items-center justify-center overflow-hidden">
+                    {formData.profilePicture ? (
+                      <img
+                        src={URL.createObjectURL(formData.profilePicture)}
+                        alt="Profile"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-6 w-6 text-gray-400" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-amber-400 text-lg">
+                      {formData.displayName || "Your Name"}
                     </p>
-                  )}
+                  </div>
                 </div>
-              )}
+                {formData.instruments.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-400">Plays:</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {formData.instruments.map((inst) => (
+                        <span
+                          key={inst}
+                          className="bg-amber-500/20 text-amber-300 px-2 py-1 rounded-full text-xs"
+                        >
+                          {inst}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-4">
-              {step >= 2 && (
-                <div className="bg-gray-800 rounded-xl p-4">
-                  <h4 className="font-semibold mb-2">Genres & Experience</h4>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {formData.genres.slice(0, 3).map((genre) => (
-                      <span
-                        key={genre}
-                        className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-sm"
-                      >
-                        {genre}
-                      </span>
-                    ))}
-                    {formData.genres.length > 3 && (
-                      <span className="text-gray-400 text-sm">
-                        +{formData.genres.length - 3} more
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-gray-400">
-                    {formData.experienceLevel || "Experience level"}
-                  </p>
+              <div className="bg-gray-800 rounded-xl p-4">
+                <h4 className="font-semibold mb-2">Genres & Experience</h4>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {formData.genres.slice(0, 3).map((genre) => (
+                    <span
+                      key={genre}
+                      className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-sm"
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                  {formData.genres.length > 3 && (
+                    <span className="text-gray-400 text-sm">
+                      +{formData.genres.length - 3} more
+                    </span>
+                  )}
                 </div>
-              )}
+                <p className="text-gray-400">
+                  {formData.experienceLevel || "Experience level"}
+                </p>
+              </div>
 
-              {step >= 3 && (
-                <>
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <Headphones className="h-5 w-5" />
-                      Audio Samples
-                    </h4>
-                    {formData.audioSamples.length > 0 ? (
-                      <div className="space-y-3">
-                        {formData.audioSamples.map((file, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg"
-                          >
-                            <Volume2 className="h-4 w-4 text-amber-400" />
-                            <span className="text-sm truncate flex-1">
-                              {file.name}
-                            </span>
-                          </div>
-                        ))}
+              <div className="bg-gray-800 rounded-xl p-4">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Headphones className="h-5 w-5" />
+                  Audio Samples
+                </h4>
+                {formData.audioSamples.length > 0 ? (
+                  <div className="space-y-3">
+                    {formData.audioSamples.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg"
+                      >
+                        <Volume2 className="h-4 w-4 text-amber-400" />
+                        <span className="text-sm truncate flex-1">
+                          {file.name}
+                        </span>
                       </div>
-                    ) : (
-                      <p className="text-gray-500 italic">
-                        No audio samples yet
-                      </p>
-                    )}
+                    ))}
                   </div>
-
-                  {formData.availability && (
-                    <div className="bg-gray-800 rounded-xl p-4">
-                      <h4 className="font-semibold mb-2">Availability</h4>
-                      <p className="text-gray-300 text-sm">
-                        {formData.availability}
-                      </p>
-                    </div>
-                  )}
-
-                  {formData.bio && (
-                    <div className="bg-gray-800 rounded-xl p-4">
-                      <h4 className="font-semibold mb-2">Bio</h4>
-                      <p className="text-gray-300 text-sm line-clamp-3">
-                        {formData.bio}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
+                ) : (
+                  <p className="text-gray-500 italic">No audio samples yet</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
