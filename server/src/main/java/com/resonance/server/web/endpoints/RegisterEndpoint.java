@@ -2,12 +2,17 @@ package com.resonance.server.web.endpoints;
 
 import com.password4j.Password;
 import com.resonance.server.Server;
+import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.UserAccount;
+import com.resonance.server.exception.AlreadyExistsException;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.ConflictResponse;
 import io.javalin.http.Context;
+import io.javalin.http.InternalServerErrorResponse;
 import org.jetbrains.annotations.NotNull;
+import org.jooq.exception.IntegrityConstraintViolationException;
+import reactor.core.Exceptions;
 
 import java.time.Duration;
 import java.util.regex.Pattern;
@@ -49,23 +54,30 @@ public class RegisterEndpoint implements EndpointGroup {
 			throw new BadRequestResponse("Passwords do not match");
 		}
 		
-		//check if account already exists
-		final UserAccount userAccount = Server.INSTANCE.getDatabaseManager().findAccount(email).block();
-		if(userAccount != null) {
-			throw new ConflictResponse("Email address already in use");
-		}
-		
 		final String hashedPassword = Password.hash(password)
 											  .withBcrypt()
 											  .getResult();
 		
-		final UserAccount account = Server.INSTANCE.getDatabaseManager().createAccount(email, hashedPassword, true, false).block();
+		final UserAccount account;
 		
-		if(account == null) {
-			throw new ConflictResponse("Email address already in use");
+		try {
+			account = Server.INSTANCE.getDatabaseManager().createAccount(email, hashedPassword, true, false).block();
+			
+			if(account == null) {
+				throw new InternalServerErrorResponse("Failed to create account");
+			}
+		} catch(Throwable t) {
+			// Exceptions.unwrap() to get the original exception
+			final Throwable error = Exceptions.unwrap(t);
+			
+			if(error instanceof AlreadyExistsException) {
+				throw new ConflictResponse("Email address already in use");
+			}
+			
+			throw new InternalServerErrorResponse("Failed to create account");
 		}
 		
-		ctx.json(account);
+		ctx.json(ConfigHolder.GSON.toJson(account.toJson(false)));
 		ctx.status(200);
 	}
 }

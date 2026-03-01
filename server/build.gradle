@@ -25,8 +25,9 @@ dependencies {
 	//jooq for database connection
 	implementation "org.jooq:jooq:3.20.11"
 	
-	//mysql database driver
+	//database drivers
 	implementation "com.mysql:mysql-connector-j:9.6.0"
+	implementation "org.mariadb.jdbc:mariadb-java-client:3.5.7"
 	
 	//password hashing
 	implementation "com.password4j:password4j:1.8.4"

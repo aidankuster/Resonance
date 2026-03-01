@@ -2,6 +2,7 @@ package com.resonance.server.web.endpoints;
 
 import com.google.gson.JsonArray;
 import com.resonance.server.Server;
+import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.tags.Genre;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.Context;
@@ -25,7 +26,7 @@ public class GenresEndpoint implements EndpointGroup {
 	}
 	
 	private void handle(@NotNull Context ctx) {
-		final List<Genre> genres = Server.INSTANCE.getDatabaseManager().getGenreList().collectList().block();
+		final List<Genre> genres = Server.INSTANCE.getDatabaseManager().getGenres().collectList().block();
 		
 		if(genres == null) {
 			throw new InternalServerErrorResponse();
@@ -36,6 +37,6 @@ public class GenresEndpoint implements EndpointGroup {
 			array.add(genre.getName());
 		}
 		
-		ctx.result(array.toString());
+		ctx.result(ConfigHolder.GSON.toJson(array));
 	}
 }

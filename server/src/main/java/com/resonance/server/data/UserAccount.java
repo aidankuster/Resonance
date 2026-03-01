@@ -4,6 +4,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.tags.Tag;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jooq.EnumType;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -11,7 +14,15 @@ import java.util.HashSet;
 /**
  * @author John 2/4/2026
  */
-public record UserAccount(int id, String emailAddress, String hashedPassword, boolean enabled, boolean admin, UserAccountInfo info, Tag[] tags) {
+public record UserAccount(
+		int id,
+		@NotNull String emailAddress,
+		@NotNull String hashedPassword,
+		boolean enabled,
+		boolean admin,
+		@NotNull UserInfo info,
+		@NotNull Tag[] tags
+) {
 	
 	public Mutable mutable() {
 		return new Mutable(this);
@@ -43,7 +54,7 @@ public record UserAccount(int id, String emailAddress, String hashedPassword, bo
 		private String hashedPassword;
 		private boolean enabled;
 		private boolean admin;
-		private final UserAccountInfo.Mutable info;
+		private final UserInfo.Mutable info;
 		private final HashSet<Tag> tags = new HashSet<>();
 		
 		public Mutable(UserAccount user) {
@@ -56,6 +67,18 @@ public record UserAccount(int id, String emailAddress, String hashedPassword, bo
 			this.info = user.info().mutable();
 			
 			this.tags.addAll(Arrays.asList(user.tags()));
+		}
+		
+		public UserAccount build() {
+			return new UserAccount(
+					this.id,
+					this.emailAddress,
+					this.hashedPassword,
+					this.enabled,
+					this.admin,
+					this.info.build(),
+					this.tags.toArray(new Tag[0])
+			);
 		}
 		
 		public int getID() {
@@ -94,7 +117,7 @@ public record UserAccount(int id, String emailAddress, String hashedPassword, bo
 			this.admin = admin;
 		}
 		
-		public UserAccountInfo.Mutable getInfo() {
+		public UserInfo.Mutable getInfo() {
 			return this.info;
 		}
 		
@@ -103,4 +126,90 @@ public record UserAccount(int id, String emailAddress, String hashedPassword, bo
 		}
 	}
 	
+	public record UserInfo(String displayName, String bio, String availability, ExperienceLevel experienceLevel) {
+		
+		public Mutable mutable() {
+			return new Mutable(this);
+		}
+		
+		public JsonObject toJson() {
+			return ConfigHolder.GSON.toJsonTree(this, UserInfo.class).getAsJsonObject();
+		}
+		
+		public enum ExperienceLevel implements EnumType {
+			BEGINNER,
+			INTERMEDIATE,
+			ADVANCED,
+			PROFESSIONAL;
+			
+			@NotNull
+			@Override
+			public String getLiteral() {
+				return this.name();
+			}
+			
+			@Nullable
+			@Override
+			public String getName() {
+				return "experience_level";
+			}
+		}
+		
+		public static class Mutable {
+			
+			private String displayName;
+			private String bio;
+			private String availability;
+			private ExperienceLevel experienceLevel;
+			
+			public Mutable(UserInfo accountInfo) {
+				this.displayName = accountInfo.displayName();
+				this.bio = accountInfo.bio();
+				this.availability = accountInfo.availability();
+				this.experienceLevel = accountInfo.experienceLevel();
+			}
+			
+			public UserInfo build() {
+				return new UserInfo(
+						this.displayName,
+						this.bio,
+						this.availability,
+						this.experienceLevel
+				);
+			}
+			
+			public String getDisplayName() {
+				return this.displayName;
+			}
+			
+			public void setDisplayName(String displayName) {
+				this.displayName = displayName;
+			}
+			
+			public String getBio() {
+				return this.bio;
+			}
+			
+			public void setBio(String bio) {
+				this.bio = bio;
+			}
+			
+			public String getAvailability() {
+				return this.availability;
+			}
+			
+			public void setAvailability(String availability) {
+				this.availability = availability;
+			}
+			
+			public ExperienceLevel getExperienceLevel() {
+				return this.experienceLevel;
+			}
+			
+			public void setExperienceLevel(ExperienceLevel level) {
+				this.experienceLevel = level;
+			}
+		}
+		
+	}
 }

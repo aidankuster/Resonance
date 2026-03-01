@@ -2,22 +2,22 @@ package com.resonance.server.database;
 
 import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.UserAccount;
-import com.resonance.server.data.UserAccountInfo;
 import com.resonance.server.data.tags.Genre;
 import com.resonance.server.data.tags.Instrument;
 import com.resonance.server.data.tags.Tag;
+import com.resonance.server.exception.AlreadyExistsException;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
-import org.jooq.Field;
+import org.jooq.Row2;
+import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.util.HashSet;
+import java.util.*;
 
 import static org.jooq.impl.DSL.*;
 
@@ -56,6 +56,11 @@ public class DatabaseManager implements AutoCloseable {
 		);
 		
 		try {
+			
+			// i have no fucking idea why this is necessary but it is,
+			// because without loading the class beforehand jdbc cannot find the mariadb driver
+			Class.forName("org.mariadb.jdbc.Driver");
+			
 			this.connection = DriverManager.getConnection(url, this.config.username, this.config.password);
 		} catch(Exception e) {
 			throw new RuntimeException("Failed to connect to database", e);
@@ -69,6 +74,15 @@ public class DatabaseManager implements AutoCloseable {
 		
 	}
 	
+	/**
+	 * Attempts to register a new account
+	 *
+	 * @param emailAddress
+	 * @param hashedPassword
+	 * @param enabled
+	 * @param admin
+	 * @return a Mono of the {@link UserAccount} if it was created.
+	 */
 	public Mono<UserAccount> createAccount(String emailAddress, String hashedPassword, boolean enabled, boolean admin) {
 		return Mono.from(
 				this.dsl.insertInto(
@@ -85,35 +99,116 @@ public class DatabaseManager implements AutoCloseable {
 						DSL.inline(admin, Boolean.class)
 				)
 		).flatMap((i) -> {
-			if(i > 0) {
-				return findAccount(emailAddress);
+			if(i > 0) { //if row was actually created
+				
+				return findAccount(emailAddress).flatMap(account -> {
+					
+					//create a row in user_account_info table as well
+					final Mono<Integer> accountInfo = Mono.from(
+							this.dsl.insertInto(
+									table("user_account_info")
+							).columns(
+									field("account_id"),
+									field("display_name"),
+									field("bio"),
+									field("availability"),
+									field("experience_level")
+							).values(
+									inline(account.id(), Integer.class),
+									inline(account.info().displayName(), String.class),
+									inline(account.info().bio(), String.class),
+									inline(account.info().availability(), String.class),
+									inline(account.info().experienceLevel(), UserAccount.UserInfo.ExperienceLevel.class)
+							));
+					
+					
+					return accountInfo.then(Mono.just(account));
+				});
 			}
-			return null;
+			return Mono.error(new AlreadyExistsException());
+		}).onErrorMap(err -> {
+			if(err instanceof IntegrityConstraintViolationException) {
+				return new AlreadyExistsException();
+			}
+			return err;
 		});
 	}
 	
-	public Flux<Integer> updateAccount(UserAccount account) {
-		return Flux.from(
-				this.dsl.insertInto(
-							table("user_account")
-					).columns(
-							field("account_id"),
-							field("email_address"),
-							field("password"),
-							field("enabled"),
-							field("admin")
-					).values(
-							DSL.inline(account.id(), Integer.class),
-							DSL.inline(account.emailAddress(), String.class),
-							DSL.inline(account.hashedPassword(), String.class),
-							DSL.inline(account.enabled(), Boolean.class),
-							DSL.inline(account.admin(), Boolean.class)
-					).onDuplicateKeyUpdate()
-						.set(field("email_address"), DSL.inline(account.emailAddress(), String.class))
-						.set(field("password"), DSL.inline(account.hashedPassword(), String.class))
-						.set(field("enabled"), DSL.inline(account.enabled(), Boolean.class))
-						.set(field("admin"), DSL.inline(account.admin(), Boolean.class))
-		);
+	public Mono<Void> updateAccount(UserAccount account) {
+		return Mono.from(
+				this.dsl.transactionPublisher(conf -> {
+					final DSLContext tx = using(conf);
+					
+					//update accounts row
+					final var upsertAccount = tx.insertInto(table("user_account"))
+												.columns(
+														field("account_id"),
+														field("email_address"),
+														field("password"),
+														field("enabled"),
+														field("admin")
+												)
+												.values(
+														inline(account.id(), Integer.class),
+														inline(account.emailAddress(), String.class),
+														inline(account.hashedPassword(), String.class),
+														inline(account.enabled(), Boolean.class),
+														inline(account.admin(), Boolean.class)
+												)
+												.onDuplicateKeyUpdate()
+												.set(field("email_address"), inline(account.emailAddress(), String.class))
+												.set(field("password"), inline(account.hashedPassword(), String.class))
+												.set(field("enabled"), inline(account.enabled(), Boolean.class))
+												.set(field("admin"), inline(account.admin(), Boolean.class));
+					
+					//update account info row
+					final UserAccount.UserInfo info = account.info();
+					final var upsertInfo = tx.insertInto(table("user_account_info"))
+											 .columns(
+													 field("account_id"),
+													 field("display_name"),
+													 field("bio"),
+													 field("availability"),
+													 field("experience_level")
+											 )
+											 .values(
+													 inline(account.id(), Integer.class),
+													 inline(info.displayName(), String.class),
+													 inline(info.bio(), String.class),
+													 inline(info.availability(), String.class),
+													 inline(info.experienceLevel(), UserAccount.UserInfo.ExperienceLevel.class)
+											 ).onDuplicateKeyUpdate()
+											 .set(field("display_name"), inline(info.displayName(), String.class))
+											 .set(field("bio"), inline(info.bio(), String.class))
+											 .set(field("availability"), inline(info.availability(), String.class))
+											 .set(field("experience_level"), inline(info.experienceLevel(), UserAccount.UserInfo.ExperienceLevel.class));
+					
+					//replace tags
+					final var deleteTags = tx.deleteFrom(table("user_account_tags"))
+											 .where(field("account_id", Integer.class).eq(inline(account.id(), Integer.class)));
+					
+					final List<Row2<Integer, Integer>> tagRows = Arrays.stream(account.tags())
+																				.filter(Objects::nonNull)
+																				.map(t -> row(
+																					 inline(account.id(), Integer.class),
+																					 inline(t.getTagID(), Integer.class)
+																				)).toList();
+
+					final var insertTags = tx.insertInto(table("user_account_tags"))
+											 .columns(
+													 field("account_id", Integer.class),
+													 field("tag_id", Integer.class)
+											 )
+											 .valuesOfRows(tagRows);
+					
+					return Flux.concat(
+							Mono.from(upsertAccount).then(),
+							Mono.from(upsertInfo).then(),
+							Mono.from(deleteTags).then(),
+							tagRows.isEmpty() ? Mono.empty() : Mono.from(insertTags).then()
+					);
+				})
+		).then();
 	}
 	
 	public Mono<UserAccount> findAccount(int id) {
@@ -151,6 +246,10 @@ public class DatabaseManager implements AutoCloseable {
 
 			final String displayName = first.get(field("display_name", SQLDataType.VARCHAR));
 			final String bio = first.get(field("bio", SQLDataType.VARCHAR));
+			final String availability = first.get(field("availability", SQLDataType.VARCHAR));
+			final UserAccount.UserInfo.ExperienceLevel experienceLevel = first.get(
+					field("experience_level", SQLDataType.VARCHAR.asEnumDataType(UserAccount.UserInfo.ExperienceLevel.class))
+			);
 
 			final HashSet<Tag> tags = new HashSet<>();
 			for(var record : records) {
@@ -167,25 +266,30 @@ public class DatabaseManager implements AutoCloseable {
 					hashedPassword,
 					enabled,
 					admin,
-					new UserAccountInfo(displayName, bio),
+					new UserAccount.UserInfo(displayName, bio, availability, experienceLevel),
 					tags.toArray(Tag[]::new)
 			));
 		});
 	}
 	
-	
-
-	public Flux<Genre> getGenreList() {
-		return Flux.from(this.dsl.selectFrom("genres")).map(record -> {
-					final int genreID = record.get(field("genre_id", Integer.class));
-					final int tagID = record.get(field("tag_id", Integer.class));
-					final String name = record.get(field("name", SQLDataType.VARCHAR));
-					return new Genre(genreID, tagID, name);
-				}
-		);
+	public Flux<Tag> getTags() {
+		return Flux.from(this.dsl.selectFrom("tags")).map(record -> {
+			final int tagID = record.get(field("tag_id", Integer.class));
+			final String name = record.get(field("name", SQLDataType.VARCHAR));
+			return new Tag(tagID, name);
+		});
 	}
 	
-	public Flux<Instrument> getInstrumentsList() {
+	public Flux<Genre> getGenres() {
+		return Flux.from(this.dsl.selectFrom("genres")).map(record -> {
+			final int genreID = record.get(field("genre_id", Integer.class));
+			final int tagID = record.get(field("tag_id", Integer.class));
+			final String name = record.get(field("name", SQLDataType.VARCHAR));
+			return new Genre(genreID, tagID, name);
+		});
+	}
+	
+	public Flux<Instrument> getInstruments() {
 		return Flux.from(this.dsl.selectFrom("instruments")).map(record -> {
 			final int instrumentID = record.get(field("instrument_id", Integer.class));
 			final int tagID = record.get(field("tag_id", Integer.class));
@@ -218,6 +322,8 @@ public class DatabaseManager implements AutoCloseable {
 											.column("account_id", SQLDataType.INTEGER.identity(true))
 											.column("display_name", SQLDataType.VARCHAR(128))
 											.column("bio", SQLDataType.VARCHAR(255))
+											.column("availability", SQLDataType.VARCHAR(255))
+											.column("experience_level", SQLDataType.VARCHAR.asEnumDataType(UserAccount.UserInfo.ExperienceLevel.class))
 											.constraints(
 													primaryKey("account_id"),
 													constraint("fk_account_id")

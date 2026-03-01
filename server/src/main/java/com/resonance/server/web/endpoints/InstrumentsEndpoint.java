@@ -2,6 +2,7 @@ package com.resonance.server.web.endpoints;
 
 import com.google.gson.JsonArray;
 import com.resonance.server.Server;
+import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.tags.Instrument;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.Context;
@@ -26,7 +27,7 @@ public class InstrumentsEndpoint implements EndpointGroup {
 	}
 	
 	private void handle(@NotNull Context ctx) {
-		final List<Instrument> instruments = Server.INSTANCE.getDatabaseManager().getInstrumentsList().collectList().block();
+		final List<Instrument> instruments = Server.INSTANCE.getDatabaseManager().getInstruments().collectList().block();
 		
 		if(instruments == null) {
 			throw new InternalServerErrorResponse();
@@ -37,6 +38,6 @@ public class InstrumentsEndpoint implements EndpointGroup {
 			array.add(instrument.getName());
 		}
 		
-		ctx.result(array.toString());
+		ctx.result(ConfigHolder.GSON.toJson(array));
 	}
 }
