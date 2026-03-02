@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Music,
@@ -20,6 +20,21 @@ function ProfileCreation() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [instruments, setInstruments] = useState<string[]>([]);
+  const [genres, setGenres] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/instruments")
+      .then((res) => res.json())
+      .then((data) => setInstruments(data))
+      .catch((err) => console.error("Failed to fetch instruments:", err));
+
+    fetch("/api/genres")
+      .then((res) => res.json())
+      .then((data) => setGenres(data))
+      .catch((err) => console.error("Failed to fetch genres:", err));
+  }, []);
 
   const [formData, setFormData] = useState({
     // Account fields
@@ -46,44 +61,6 @@ function ProfileCreation() {
     genres: "",
     experienceLevel: "",
   });
-
-  const instruments = [
-    "Piano",
-    "Guitar",
-    "Violin",
-    "Drums",
-    "Saxophone",
-    "Voice",
-    "Bass",
-    "Cello",
-    "Trumpet",
-    "Flute",
-    "Clarinet",
-    "Viola",
-    "Harp",
-    "Synthesizer",
-    "Ukulele",
-  ];
-
-  const genres = [
-    "Classical",
-    "Jazz",
-    "Rock",
-    "Pop",
-    "Hip Hop",
-    "R&B",
-    "Electronic",
-    "Folk",
-    "Metal",
-    "Blues",
-    "Country",
-    "Funk",
-    "Soul",
-    "Latin",
-    "World",
-    "Musical Theatre",
-    "Film Score",
-  ];
 
   const experienceLevels = [
     "Beginner",
