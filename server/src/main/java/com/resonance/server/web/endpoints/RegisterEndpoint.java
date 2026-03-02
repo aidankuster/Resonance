@@ -11,10 +11,8 @@ import io.javalin.http.ConflictResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import org.jetbrains.annotations.NotNull;
-import org.jooq.exception.IntegrityConstraintViolationException;
 import reactor.core.Exceptions;
 
-import java.time.Duration;
 import java.util.regex.Pattern;
 
 import static io.javalin.apibuilder.ApiBuilder.*;

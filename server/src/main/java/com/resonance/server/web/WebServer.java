@@ -1,10 +1,7 @@
 package com.resonance.server.web;
 
 import com.resonance.server.config.ConfigHolder;
-import com.resonance.server.web.endpoints.GenresEndpoint;
-import com.resonance.server.web.endpoints.InstrumentsEndpoint;
-import com.resonance.server.web.endpoints.ProfileEndpoint;
-import com.resonance.server.web.endpoints.RegisterEndpoint;
+import com.resonance.server.web.endpoints.*;
 import io.javalin.Javalin;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.staticfiles.Location;
@@ -63,6 +60,7 @@ public class WebServer {
 	
 	private void initializeEndpoints() {
 		this.endpoints.add(new RegisterEndpoint());
+		this.endpoints.add(new LoginEndpoint());
 		this.endpoints.add(new GenresEndpoint());
 		this.endpoints.add(new InstrumentsEndpoint());
 		this.endpoints.add(new ProfileEndpoint());

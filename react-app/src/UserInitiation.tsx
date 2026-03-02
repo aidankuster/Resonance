@@ -55,12 +55,36 @@ function UserInitiation() {
     return isValid;
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateLogin()) {
-      // Should authenticate here
       console.log("Logging in with:", loginData);
-      navigate("/dashboard");
+
+      const params = new URLSearchParams();
+      params.append('email', loginData.email);
+      params.append('password', loginData.password);
+
+      try {
+          const response = await fetch('/api/login', {
+              method: 'POST',
+              body: params,
+          });
+
+          if (response.ok) { //status code 2XX
+              const result = await response.json();
+              console.log('Success:', result);
+
+              //TODO: load data
+              navigate("/dashboard");
+          } else {
+              console.error('Request failed with status:', response.status);
+
+              //TODO: handle error 401 (unauthorized) (invalid username/password)
+              //TODO: handle error 400 (bad request) (missing username/password)
+          }
+      } catch (error) {
+          console.error('Error:', error);
+      }
     }
   };
 
