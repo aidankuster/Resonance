@@ -8,6 +8,7 @@ import com.resonance.server.data.tags.Tag;
 import com.resonance.server.exception.AlreadyExistsException;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Record;
 import org.jooq.Row2;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.impl.DSL;
@@ -236,7 +237,7 @@ public class DatabaseManager implements AutoCloseable {
 				return Flux.empty();
 			}
 
-			final var first = records.getFirst();
+			final Record first = records.getFirst();
 
 			final int id = first.get(field("account_id", SQLDataType.INTEGER));
 			final String email = first.get(field("email_address", SQLDataType.VARCHAR));
@@ -252,11 +253,15 @@ public class DatabaseManager implements AutoCloseable {
 			);
 
 			final HashSet<Tag> tags = new HashSet<>();
-			for(var record : records) {
+			for(Record record : records) {
 				final Integer tagID = record.get(field("tag_id", Integer.class));
 				final String tagName = record.get(field("name", SQLDataType.VARCHAR));
-				if(tagID != null && tagName != null) {
-					tags.add(new Tag(tagID, tagName));
+				final Tag.Type type = record.get(field("type", SQLDataType.VARCHAR.asEnumDataType(Tag.Type.class)));
+				
+				if(type.equals(Tag.Type.INSTRUMENT)) {
+					tags.add(new Instrument(tagID, tagName));
+				} else if(type.equals(Tag.Type.GENRE)) {
+					tags.add(new Genre(tagID, tagName));
 				}
 			}
 
@@ -272,30 +277,28 @@ public class DatabaseManager implements AutoCloseable {
 		});
 	}
 	
-	public Flux<Tag> getTags() {
-		return Flux.from(this.dsl.selectFrom("tags")).map(record -> {
+	public Flux<Tag> getTags(Condition... conditions) {
+		return Flux.from(this.dsl.selectFrom("tags").where(conditions)).handle((record, sink) -> {
 			final int tagID = record.get(field("tag_id", Integer.class));
 			final String name = record.get(field("name", SQLDataType.VARCHAR));
-			return new Tag(tagID, name);
+			final Tag.Type type = Tag.Type.valueOf(record.get(field("type", SQLDataType.VARCHAR)));		if(type.equals(Tag.Type.INSTRUMENT)) {
+				sink.next(new Instrument(tagID, name));
+			} else if(type.equals(Tag.Type.GENRE)) {
+				sink.next(new Genre(tagID, name));
+			} else {
+				sink.error(new RuntimeException("Unknown tag type: " + type));
+			}
 		});
 	}
 	
 	public Flux<Genre> getGenres() {
-		return Flux.from(this.dsl.selectFrom("genres")).map(record -> {
-			final int genreID = record.get(field("genre_id", Integer.class));
-			final int tagID = record.get(field("tag_id", Integer.class));
-			final String name = record.get(field("name", SQLDataType.VARCHAR));
-			return new Genre(genreID, tagID, name);
-		});
+		return this.getTags(DSL.field("type", SQLDataType.VARCHAR.asEnumDataType(Tag.Type.class)).eq(Tag.Type.GENRE))
+				   .cast(Genre.class);
 	}
 	
 	public Flux<Instrument> getInstruments() {
-		return Flux.from(this.dsl.selectFrom("instruments")).map(record -> {
-			final int instrumentID = record.get(field("instrument_id", Integer.class));
-			final int tagID = record.get(field("tag_id", Integer.class));
-			final String name = record.get(field("name", SQLDataType.VARCHAR));
-			return new Instrument(instrumentID, tagID, name);
-		});
+		return this.getTags(DSL.field("type", SQLDataType.VARCHAR.asEnumDataType(Tag.Type.class)).eq(Tag.Type.INSTRUMENT))
+				   .cast(Instrument.class);
 	}
 	
 	@Override
@@ -304,84 +307,115 @@ public class DatabaseManager implements AutoCloseable {
 	}
 	
 	private boolean initializeDefaultTables(DSLContext dsl) {
+		
+		Set<String> existingTables = new HashSet<>();
+		try {
+			var metaData = connection.getMetaData();
+			try (var rs = metaData.getTables(null, null, "%", new String[]{"TABLE"})) {
+				while (rs.next()) {
+					existingTables.add(rs.getString("TABLE_NAME").toLowerCase());
+				}
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to read database metadata", e);
+		}
+		
+		boolean created = false;
+		
 		//accounts table, this will hold the main data of the account
-		final int userAccountTable = dsl.createTableIfNotExists("user_account")
-										.column("account_id", SQLDataType.INTEGER.identity(true))
-										.column("email_address", SQLDataType.VARCHAR(255))
-										.column("password", SQLDataType.VARCHAR(255))
-										.column("enabled", SQLDataType.BOOLEAN.defaultValue(true))
-										.column("admin", SQLDataType.BOOLEAN.defaultValue(false))
-										.constraints(
-												primaryKey("account_id"),
-												constraint("uk_email").unique("email_address")
-										)
-										.execute();
+		if (!existingTables.contains("user_account")) {
+			dsl.createTable("user_account")
+			   .column("account_id", SQLDataType.INTEGER.identity(true))
+			   .column("email_address", SQLDataType.VARCHAR(255))
+			   .column("password", SQLDataType.VARCHAR(255))
+			   .column("enabled", SQLDataType.BOOLEAN.defaultValue(true))
+			   .column("admin", SQLDataType.BOOLEAN.defaultValue(false))
+			   .constraints(
+					   primaryKey("account_id"),
+					   constraint("uk_email").unique("email_address")
+			   )
+			   .execute();
+			created = true;
+		}
 		
 		//account info table, this will hold extra data of the account
-		final int userAccountInfoTable = dsl.createTableIfNotExists("user_account_info")
-											.column("account_id", SQLDataType.INTEGER.identity(true))
-											.column("display_name", SQLDataType.VARCHAR(128))
-											.column("bio", SQLDataType.VARCHAR(255))
-											.column("availability", SQLDataType.VARCHAR(255))
-											.column("experience_level", SQLDataType.VARCHAR.asEnumDataType(UserAccount.UserInfo.ExperienceLevel.class))
-											.constraints(
-													primaryKey("account_id"),
-													constraint("fk_account_id")
-															.foreignKey("account_id")
-															.references("user_account", "account_id")
-											)
-											.execute();
+		if (!existingTables.contains("user_account_info")) {
+			dsl.createTable("user_account_info")
+			   .column("account_id", SQLDataType.INTEGER.identity(true))
+			   .column("display_name", SQLDataType.VARCHAR(128))
+			   .column("bio", SQLDataType.VARCHAR(255))
+			   .column("availability", SQLDataType.VARCHAR(255))
+			   .column("experience_level", SQLDataType.VARCHAR.asEnumDataType(UserAccount.UserInfo.ExperienceLevel.class))
+			   .constraints(
+					   primaryKey("account_id"),
+					   constraint("fk_account_id")
+							   .foreignKey("account_id")
+							   .references("user_account", "account_id")
+			   )
+			   .execute();
+			created = true;
+		}
 		
 		//tags table, this will store the set of possible account tags
-		final int tagsTable = dsl.createTableIfNotExists("tags")
-								 .column("tag_id", SQLDataType.INTEGER.identity(true))
-								 .column("name", SQLDataType.VARCHAR(64))
-								 .primaryKey("tag_id")
-								 .execute();
+		if (!existingTables.contains("tags")) {
+			dsl.createTable("tags")
+			   .column("tag_id", SQLDataType.INTEGER.identity(true))
+			   .column("name", SQLDataType.VARCHAR(64))
+			   .column("type", SQLDataType.VARCHAR.asEnumDataType(Tag.Type.class))
+			   .primaryKey("tag_id")
+			   .execute();
+			
+			//create default tags
+			this.initializeDefaultTags(dsl);
+			created = true;
+		}
 		
 		//account tags table, this will store the tags associated with each account
-		final int userAccountTagsTable = dsl.createTableIfNotExists("user_account_tags")
-											.column("account_id", SQLDataType.INTEGER.notNull())
-											.column("tag_id", SQLDataType.INTEGER.notNull())
-											.constraints(
-													constraint("fk_account_tags_account_id")
-															.foreignKey("account_id")
-															.references("user_account", "account_id"),
-													constraint("fk_account_tags_tag_id")
-															.foreignKey("tag_id")
-															.references("tags", "tag_id")
-											)
-											.execute();
+		if (!existingTables.contains("user_account_tags")) {
+			dsl.createTable("user_account_tags")
+			   .column("account_id", SQLDataType.INTEGER.notNull())
+			   .column("tag_id", SQLDataType.INTEGER.notNull())
+			   .constraints(
+					   constraint("fk_account_tags_account_id")
+							   .foreignKey("account_id")
+							   .references("user_account", "account_id"),
+					   constraint("fk_account_tags_tag_id")
+							   .foreignKey("tag_id")
+							   .references("tags", "tag_id")
+			   )
+			   .execute();
+			created = true;
+		}
 		
-		final int genresTable = dsl.createTableIfNotExists("genres")
-								   .column("genre_id", SQLDataType.INTEGER.identity(true))
-								   .column("tag_id", SQLDataType.INTEGER.notNull())
-								   .column("name", SQLDataType.VARCHAR(128))
-								   .constraints(
-										   primaryKey("genre_id"),
-										   constraint("fk_genre_tag_id")
-												   .foreignKey("tag_id")
-												   .references("tags", "tag_id")
-								   )
-								   .execute();
-		
-		final int instrumentsTable = dsl.createTableIfNotExists("instruments")
-										.column("instrument_id", SQLDataType.INTEGER.identity(true))
-										.column("tag_id", SQLDataType.INTEGER.notNull())
-										.column("name", SQLDataType.VARCHAR(128))
-										.constraints(
-												primaryKey("instrument_id"),
-												constraint("fk_instrument_tag_id")
-														.foreignKey("tag_id")
-														.references("tags", "tag_id")
-										)
-										.execute();
-		
-		return userAccountTable
-				+ userAccountInfoTable
-				+ tagsTable
-				+ userAccountTagsTable
-				+ genresTable
-				+ instrumentsTable > 0;
+		return created;
 	}
+	
+	private void initializeDefaultTags(DSLContext dsl) {
+		final String[] instruments = {
+				"Piano", "Guitar", "Violin", "Drums", "Saxophone",
+				"Voice", "Bass", "Cello", "Trumpet", "Flute",
+				"Clarinet", "Viola", "Harp", "Synthesizer", "Ukulele"
+		};
+		
+		final String[] genres = {
+				"Classical", "Jazz", "Rock", "Pop", "Hip Hop",
+				"R&B", "Electronic", "Folk", "Metal", "Blues",
+				"Country", "Funk", "Soul", "Latin", "World",
+				"Musical Theatre", "Film Score"
+		};
+		
+		var insert = dsl.insertInto(table("tags"))
+						.columns(field("name"), field("type"));
+		
+		for (String instrument : instruments) {
+			insert = insert.values(inline(instrument, String.class), inline(Tag.Type.INSTRUMENT, Tag.Type.class));
+		}
+		
+		for (String genre : genres) {
+			insert = insert.values(inline(genre, String.class), inline(Tag.Type.GENRE, Tag.Type.class));
+		}
+		
+		insert.execute();
+	}
+	
 }

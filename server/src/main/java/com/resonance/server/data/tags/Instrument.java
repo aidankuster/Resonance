@@ -5,15 +5,8 @@ package com.resonance.server.data.tags;
  */
 public class Instrument extends Tag {
 	
-	private final int instrumentID;
-	
-	public Instrument(int instrumentID, int tagID, String name) {
-		super(tagID, name);
-		this.instrumentID = instrumentID;
-	}
-	
-	public int getInstrumentID() {
-		return this.instrumentID;
+	public Instrument(int tagID, String name) {
+		super(tagID, name, Type.INSTRUMENT);
 	}
 	
 }

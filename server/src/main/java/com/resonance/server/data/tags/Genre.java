@@ -5,15 +5,8 @@ package com.resonance.server.data.tags;
  */
 public class Genre extends Tag {
 	
-	private final int genreID;
-	
-	public Genre(int genreID, int tagID, String name) {
-		super(tagID, name);
-		this.genreID = genreID;
-	}
-	
-	public int getGenreID() {
-		return this.genreID;
+	public Genre(int tagID, String name) {
+		super(tagID, name, Type.GENRE);
 	}
 	
 }
