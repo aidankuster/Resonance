@@ -256,7 +256,12 @@ public class DatabaseManager implements AutoCloseable {
 			for(Record record : records) {
 				final Integer tagID = record.get(field("tag_id", Integer.class));
 				final String tagName = record.get(field("name", SQLDataType.VARCHAR));
-				final Tag.Type type = record.get(field("type", SQLDataType.VARCHAR.asEnumDataType(Tag.Type.class)));
+				
+				if(tagID == null || tagName == null) {
+					continue;
+				}
+				
+				final Tag.Type type = Tag.Type.valueOf(record.get(field("type", SQLDataType.VARCHAR)));
 				
 				if(type.equals(Tag.Type.INSTRUMENT)) {
 					tags.add(new Instrument(tagID, tagName));

@@ -68,6 +68,8 @@ public class RegisterEndpoint implements EndpointGroup {
 			// Exceptions.unwrap() to get the original exception
 			final Throwable error = Exceptions.unwrap(t);
 			
+			Server.LOGGER.error("Failed to create account", error);
+			
 			if(error instanceof AlreadyExistsException) {
 				throw new ConflictResponse("Email address already in use");
 			}
