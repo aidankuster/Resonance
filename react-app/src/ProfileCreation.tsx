@@ -21,35 +21,66 @@ function ProfileCreation() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [instruments, setInstruments] = useState<string[]>([]);
-  const [genres, setGenres] = useState<string[]>([]);
+  const [availableInstruments, setAvailableInstruments] = useState<string[]>(
+    [],
+  );
+  const [availableGenres, setAvailableGenres] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch("/api/instruments")
-      .then((res) => res.json())
-      .then((data) => setInstruments(data))
-      .catch((err) => console.error("Failed to fetch instruments:", err));
+    // replace with actual API calls
+    setAvailableInstruments([
+      "Piano",
+      "Guitar",
+      "Violin",
+      "Drums",
+      "Saxophone",
+      "Voice",
+      "Bass",
+      "Cello",
+      "Trumpet",
+      "Flute",
+      "Clarinet",
+      "Viola",
+      "Harp",
+      "Synthesizer",
+      "Ukulele",
+    ]);
 
-    fetch("/api/genres")
-      .then((res) => res.json())
-      .then((data) => setGenres(data))
-      .catch((err) => console.error("Failed to fetch genres:", err));
+    setAvailableGenres([
+      "Classical",
+      "Jazz",
+      "Rock",
+      "Pop",
+      "Hip Hop",
+      "R&B",
+      "Electronic",
+      "Folk",
+      "Metal",
+      "Blues",
+      "Country",
+      "Funk",
+      "Soul",
+      "Latin",
+      "World",
+      "Musical Theatre",
+      "Film Score",
+    ]);
   }, []);
 
-  const [formData, setFormData] = useState({
-    // Account fields
+  const [accountData, setAccountData] = useState({
     email: "",
     password: "",
     confirmPassword: "",
+  });
 
-    // Profile fields
+  const [profileData, setProfileData] = useState({
     displayName: "",
     bio: "",
     instruments: [] as string[],
     genres: [] as string[],
     experienceLevel: "",
     availability: "",
-    profilePicture: null as File | null, // profile picture
+    profilePicture: null as File | null,
     audioSamples: [] as File[],
   });
 
@@ -83,16 +114,19 @@ function ProfileCreation() {
     switch (step) {
       case 1:
         return (
-          validateEmail(formData.email) &&
-          validatePassword(formData.password) &&
-          formData.password === formData.confirmPassword
+          validateEmail(accountData.email) &&
+          validatePassword(accountData.password) &&
+          accountData.password === accountData.confirmPassword
         );
       case 2:
         return (
-          formData.displayName.trim() !== "" && formData.instruments.length > 0
+          profileData.displayName.trim() !== "" &&
+          profileData.instruments.length > 0
         );
       case 3:
-        return formData.genres.length >= 1 && formData.experienceLevel !== "";
+        return (
+          profileData.genres.length >= 1 && profileData.experienceLevel !== ""
+        );
       case 4:
         return true;
       default:
@@ -111,37 +145,37 @@ function ProfileCreation() {
     };
 
     if (step === 1) {
-      if (!formData.email) {
+      if (!accountData.email) {
         errors.email = "Email is required";
-      } else if (!validateEmail(formData.email)) {
+      } else if (!validateEmail(accountData.email)) {
         errors.email = "Must be a valid @bravemail.uncp.edu email";
       }
 
-      if (!formData.password) {
+      if (!accountData.password) {
         errors.password = "Password is required";
-      } else if (!validatePassword(formData.password)) {
+      } else if (!validatePassword(accountData.password)) {
         errors.password =
           "Password must be at least 8 characters with uppercase, lowercase, and number";
       }
 
-      if (!formData.confirmPassword) {
+      if (!accountData.confirmPassword) {
         errors.confirmPassword = "Please confirm your password";
-      } else if (formData.password !== formData.confirmPassword) {
+      } else if (accountData.password !== accountData.confirmPassword) {
         errors.confirmPassword = "Passwords do not match";
       }
     }
 
     if (step === 2) {
-      if (formData.instruments.length === 0) {
+      if (profileData.instruments.length === 0) {
         errors.instruments = "Please select at least one instrument";
       }
     }
 
     if (step === 3) {
-      if (formData.genres.length === 0) {
+      if (profileData.genres.length === 0) {
         errors.genres = "Please select at least one genre";
       }
-      if (!formData.experienceLevel) {
+      if (!profileData.experienceLevel) {
         errors.experienceLevel = "Please select your experience level";
       }
     }
@@ -150,8 +184,18 @@ function ProfileCreation() {
     return Object.values(errors).every((error) => error === "");
   };
 
-  const handleInputChange = (field: string, value: string | string[]) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleAccountChange = (field: string, value: string) => {
+    setAccountData((prev) => ({ ...prev, [field]: value }));
+    if (formErrors[field as keyof typeof formErrors]) {
+      setFormErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleProfileChange = (
+    field: string,
+    value: string | string[] | File | null,
+  ) => {
+    setProfileData((prev) => ({ ...prev, [field]: value }));
     if (formErrors[field as keyof typeof formErrors]) {
       setFormErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -159,8 +203,8 @@ function ProfileCreation() {
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length + formData.audioSamples.length <= 3) {
-      setFormData((prev) => ({
+    if (files.length + profileData.audioSamples.length <= 3) {
+      setProfileData((prev) => ({
         ...prev,
         audioSamples: [...prev.audioSamples, ...files],
       }));
@@ -172,17 +216,15 @@ function ProfileCreation() {
   ) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         alert("Please upload an image file");
         return;
       }
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert("Image must be less than 5MB");
         return;
       }
-      setFormData((prev) => ({
+      setProfileData((prev) => ({
         ...prev,
         profilePicture: file,
       }));
@@ -190,7 +232,7 @@ function ProfileCreation() {
   };
 
   const removeAudioSample = (index: number) => {
-    setFormData((prev) => ({
+    setProfileData((prev) => ({
       ...prev,
       audioSamples: prev.audioSamples.filter((_, i) => i !== index),
     }));
@@ -223,17 +265,18 @@ function ProfileCreation() {
     try {
       const finalFormData = {
         accountInfo: {
-          email: formData.email,
+          email: accountData.email,
+          // password would be hashed on backend
         },
         profileInfo: {
-          displayName: formData.displayName,
-          instruments: formData.instruments,
-          genres: formData.genres,
-          experienceLevel: formData.experienceLevel,
-          bio: formData.bio,
-          availability: formData.availability,
-          hasProfilePicture: !!formData.profilePicture,
-          audioSampleCount: formData.audioSamples.length,
+          displayName: profileData.displayName,
+          instruments: profileData.instruments,
+          genres: profileData.genres,
+          experienceLevel: profileData.experienceLevel,
+          bio: profileData.bio,
+          availability: profileData.availability,
+          hasProfilePicture: !!profileData.profilePicture,
+          audioSampleCount: profileData.audioSamples.length,
         },
         submittedAt: new Date().toISOString(),
       };
@@ -272,8 +315,10 @@ function ProfileCreation() {
                   <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                   <input
                     type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange("email", e.target.value)}
+                    value={accountData.email}
+                    onChange={(e) =>
+                      handleAccountChange("email", e.target.value)
+                    }
                     onKeyDown={handleKeyDown}
                     className={`w-full bg-gray-900 border rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-amber-500 ${
                       formErrors.email ? "border-red-500" : "border-gray-700"
@@ -301,9 +346,9 @@ function ProfileCreation() {
                   <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                   <input
                     type={showPassword ? "text" : "password"}
-                    value={formData.password}
+                    value={accountData.password}
                     onChange={(e) =>
-                      handleInputChange("password", e.target.value)
+                      handleAccountChange("password", e.target.value)
                     }
                     onKeyDown={handleKeyDown}
                     className={`w-full bg-gray-900 border rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-amber-500 ${
@@ -343,9 +388,9 @@ function ProfileCreation() {
                   <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                   <input
                     type={showConfirmPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
+                    value={accountData.confirmPassword}
                     onChange={(e) =>
-                      handleInputChange("confirmPassword", e.target.value)
+                      handleAccountChange("confirmPassword", e.target.value)
                     }
                     onKeyDown={handleKeyDown}
                     className={`w-full bg-gray-900 border rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-amber-500 ${
@@ -397,9 +442,9 @@ function ProfileCreation() {
                 </label>
                 <input
                   type="text"
-                  value={formData.displayName}
+                  value={profileData.displayName}
                   onChange={(e) =>
-                    handleInputChange("displayName", e.target.value)
+                    handleProfileChange("displayName", e.target.value)
                   }
                   onKeyDown={handleKeyDown}
                   className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500"
@@ -416,18 +461,18 @@ function ProfileCreation() {
                   Select all that apply (at least one required)
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {instruments.map((instr) => (
+                  {availableInstruments.map((instr) => (
                     <button
                       key={instr}
                       type="button"
                       onClick={() => {
-                        const updated = formData.instruments.includes(instr)
-                          ? formData.instruments.filter((i) => i !== instr)
-                          : [...formData.instruments, instr];
-                        handleInputChange("instruments", updated);
+                        const updated = profileData.instruments.includes(instr)
+                          ? profileData.instruments.filter((i) => i !== instr)
+                          : [...profileData.instruments, instr];
+                        handleProfileChange("instruments", updated);
                       }}
                       className={`px-4 py-2 rounded-full transition ${
-                        formData.instruments.includes(instr)
+                        profileData.instruments.includes(instr)
                           ? "bg-amber-600 text-white"
                           : "bg-gray-800 hover:bg-gray-700"
                       }`}
@@ -463,20 +508,20 @@ function ProfileCreation() {
                   Select at least 1 genre that defines your style (up to 5)
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {genres.map((genre) => (
+                  {availableGenres.map((genre) => (
                     <button
                       key={genre}
                       type="button"
                       onClick={() => {
-                        const updated = formData.genres.includes(genre)
-                          ? formData.genres.filter((g) => g !== genre)
-                          : formData.genres.length < 5
-                            ? [...formData.genres, genre]
-                            : formData.genres;
-                        handleInputChange("genres", updated);
+                        const updated = profileData.genres.includes(genre)
+                          ? profileData.genres.filter((g) => g !== genre)
+                          : profileData.genres.length < 5
+                            ? [...profileData.genres, genre]
+                            : profileData.genres;
+                        handleProfileChange("genres", updated);
                       }}
                       className={`p-4 rounded-xl border-2 transition-all ${
-                        formData.genres.includes(genre)
+                        profileData.genres.includes(genre)
                           ? "border-amber-500 bg-amber-500/10"
                           : "border-gray-700 hover:border-gray-500"
                       }`}
@@ -502,10 +547,10 @@ function ProfileCreation() {
                       key={level}
                       type="button"
                       onClick={() =>
-                        handleInputChange("experienceLevel", level)
+                        handleProfileChange("experienceLevel", level)
                       }
                       className={`p-4 rounded-xl border-2 transition-all ${
-                        formData.experienceLevel === level
+                        profileData.experienceLevel === level
                           ? "border-amber-500 bg-amber-500/10"
                           : "border-gray-700 hover:border-gray-500"
                       }`}
@@ -526,15 +571,15 @@ function ProfileCreation() {
                   Musical Bio
                 </label>
                 <textarea
-                  value={formData.bio}
-                  onChange={(e) => handleInputChange("bio", e.target.value)}
+                  value={profileData.bio}
+                  onChange={(e) => handleProfileChange("bio", e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 h-32 focus:outline-none focus:border-amber-500"
                   placeholder="Tell us about your musical journey, influences, and what you're looking for..."
                   maxLength={255}
                 />
                 <p className="text-sm text-gray-500 mt-2 text-right">
-                  {formData.bio.length}/255
+                  {profileData.bio.length}/255
                 </p>
               </div>
             </div>
@@ -561,9 +606,9 @@ function ProfileCreation() {
                 <div className="flex items-center gap-6">
                   <div className="relative">
                     <div className="h-24 w-24 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-500/20 border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden">
-                      {formData.profilePicture ? (
+                      {profileData.profilePicture ? (
                         <img
-                          src={URL.createObjectURL(formData.profilePicture)}
+                          src={URL.createObjectURL(profileData.profilePicture)}
                           alt="Profile preview"
                           className="h-full w-full object-cover"
                         />
@@ -595,11 +640,11 @@ function ProfileCreation() {
                       onChange={handleProfilePictureUpload}
                       className="hidden"
                     />
-                    {formData.profilePicture && (
+                    {profileData.profilePicture && (
                       <button
                         type="button"
                         onClick={() =>
-                          setFormData((prev) => ({
+                          setProfileData((prev) => ({
                             ...prev,
                             profilePicture: null,
                           }))
@@ -643,12 +688,12 @@ function ProfileCreation() {
                 </label>
               </div>
 
-              {formData.audioSamples.length > 0 && (
+              {profileData.audioSamples.length > 0 && (
                 <div className="space-y-4">
                   <h4 className="font-semibold">
-                    Uploaded Samples ({formData.audioSamples.length}/3)
+                    Uploaded Samples ({profileData.audioSamples.length}/3)
                   </h4>
-                  {formData.audioSamples.map((file, index) => (
+                  {profileData.audioSamples.map((file, index) => (
                     <div
                       key={index}
                       className="bg-gray-800 rounded-xl p-4 flex items-center justify-between"
@@ -681,9 +726,9 @@ function ProfileCreation() {
                   Availability
                 </label>
                 <textarea
-                  value={formData.availability}
+                  value={profileData.availability}
                   onChange={(e) =>
-                    handleInputChange("availability", e.target.value)
+                    handleProfileChange("availability", e.target.value)
                   }
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -699,7 +744,7 @@ function ProfileCreation() {
                   <span>
                     Let others know when you're available to collaborate
                   </span>
-                  <span>{formData.availability.length}/255</span>
+                  <span>{profileData.availability.length}/255</span>
                 </div>
               </div>
             </div>
@@ -805,7 +850,7 @@ function ProfileCreation() {
                     isSubmitting ? "opacity-70 cursor-not-allowed" : ""
                   }`}
                 >
-                  {isSubmitting ? "Completing Profile..." : "Complete Profile"}
+                  {isSubmitting ? "Creating Profile..." : "Complete Profile"}
                 </button>
               )}
             </div>
@@ -824,9 +869,9 @@ function ProfileCreation() {
                 <h4 className="font-semibold mb-2">Basic Info</h4>
                 <div className="flex items-center gap-3 mb-3">
                   <div className="h-12 w-12 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-500/20 flex items-center justify-center overflow-hidden">
-                    {formData.profilePicture ? (
+                    {profileData.profilePicture ? (
                       <img
-                        src={URL.createObjectURL(formData.profilePicture)}
+                        src={URL.createObjectURL(profileData.profilePicture)}
                         alt="Profile"
                         className="h-full w-full object-cover"
                       />
@@ -836,15 +881,15 @@ function ProfileCreation() {
                   </div>
                   <div>
                     <p className="text-amber-400 text-lg">
-                      {formData.displayName || "Your Name"}
+                      {profileData.displayName || "Your Name"}
                     </p>
                   </div>
                 </div>
-                {formData.instruments.length > 0 && (
+                {profileData.instruments.length > 0 && (
                   <div className="mt-2">
                     <p className="text-sm text-gray-400">Plays:</p>
                     <div className="flex flex-wrap gap-2 mt-1">
-                      {formData.instruments.map((inst) => (
+                      {profileData.instruments.map((inst) => (
                         <span
                           key={inst}
                           className="bg-amber-500/20 text-amber-300 px-2 py-1 rounded-full text-xs"
@@ -862,7 +907,7 @@ function ProfileCreation() {
               <div className="bg-gray-800 rounded-xl p-4">
                 <h4 className="font-semibold mb-2">Genres & Experience</h4>
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {formData.genres.slice(0, 3).map((genre) => (
+                  {profileData.genres.slice(0, 3).map((genre) => (
                     <span
                       key={genre}
                       className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-sm"
@@ -870,14 +915,14 @@ function ProfileCreation() {
                       {genre}
                     </span>
                   ))}
-                  {formData.genres.length > 3 && (
+                  {profileData.genres.length > 3 && (
                     <span className="text-gray-400 text-sm">
-                      +{formData.genres.length - 3} more
+                      +{profileData.genres.length - 3} more
                     </span>
                   )}
                 </div>
                 <p className="text-gray-400">
-                  {formData.experienceLevel || "Experience level"}
+                  {profileData.experienceLevel || "Experience level"}
                 </p>
               </div>
 
@@ -886,9 +931,9 @@ function ProfileCreation() {
                   <Headphones className="h-5 w-5" />
                   Audio Samples
                 </h4>
-                {formData.audioSamples.length > 0 ? (
+                {profileData.audioSamples.length > 0 ? (
                   <div className="space-y-3">
-                    {formData.audioSamples.map((file, index) => (
+                    {profileData.audioSamples.map((file, index) => (
                       <div
                         key={index}
                         className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg"
