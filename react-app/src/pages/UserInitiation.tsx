@@ -10,11 +10,13 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { authAPI } from "../services/api";
 
 function UserInitiation() {
   const navigate = useNavigate();
   const [showLogin, setShowLogin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginData, setLoginData] = useState({
     email: "",
     password: "",
@@ -22,12 +24,18 @@ function UserInitiation() {
   const [loginErrors, setLoginErrors] = useState({
     email: "",
     password: "",
+    general: "",
   });
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@bravemail\.uncp\.edu$/;
+    return emailRegex.test(email);
+  };
 
   const handleLoginChange = (field: string, value: string) => {
     setLoginData((prev) => ({ ...prev, [field]: value }));
     if (loginErrors[field as keyof typeof loginErrors]) {
-      setLoginErrors((prev) => ({ ...prev, [field]: "" }));
+      setLoginErrors((prev) => ({ ...prev, [field]: "", general: "" }));
     }
   };
 
@@ -35,14 +43,15 @@ function UserInitiation() {
     const errors = {
       email: "",
       password: "",
+      general: "",
     };
     let isValid = true;
 
     if (!loginData.email) {
       errors.email = "Email is required";
       isValid = false;
-    } else if (!loginData.email.endsWith("@bravemail.uncp.edu")) {
-      errors.email = "Must use UNCP email";
+    } else if (!validateEmail(loginData.email)) {
+      errors.email = "Must use UNCP email (@bravemail.uncp.edu)";
       isValid = false;
     }
 
@@ -57,34 +66,21 @@ function UserInitiation() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateLogin()) {
-      console.log("Logging in with:", loginData);
+    if (!validateLogin()) return;
 
-      const params = new URLSearchParams();
-      params.append('email', loginData.email);
-      params.append('password', loginData.password);
-
-      try {
-          const response = await fetch('/api/login', {
-              method: 'POST',
-              body: params,
-          });
-
-          if (response.ok) { //status code 2XX
-              const result = await response.json();
-              console.log('Success:', result);
-
-              //TODO: load data
-              navigate("/dashboard");
-          } else {
-              console.error('Request failed with status:', response.status);
-
-              //TODO: handle error 401 (unauthorized) (invalid username/password)
-              //TODO: handle error 400 (bad request) (missing username/password)
-          }
-      } catch (error) {
-          console.error('Error:', error);
-      }
+    setIsSubmitting(true);
+    try {
+      const response = await authAPI.login(loginData.email, loginData.password);
+      console.log("Login successful:", response);
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      setLoginErrors({
+        ...loginErrors,
+        general: error.message || "Invalid email or password",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -168,6 +164,12 @@ function UserInitiation() {
               Enter your UNCP email and password to continue
             </p>
 
+            {loginErrors.general && (
+              <div className="bg-red-900/20 border border-red-800 rounded-xl p-4 mb-6">
+                <p className="text-red-400 text-sm">{loginErrors.general}</p>
+              </div>
+            )}
+
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -233,9 +235,12 @@ function UserInitiation() {
               <div className="pt-4">
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 py-4 rounded-xl font-bold text-lg transition transform hover:scale-105"
+                  disabled={isSubmitting}
+                  className={`w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 py-4 rounded-xl font-bold text-lg transition transform hover:scale-105 ${
+                    isSubmitting ? "opacity-70 cursor-not-allowed" : ""
+                  }`}
                 >
-                  Log In
+                  {isSubmitting ? "Logging in..." : "Log In"}
                 </button>
               </div>
 
@@ -268,7 +273,9 @@ function UserInitiation() {
               <Music className="h-6 w-6 text-amber-500" />
               <span className="text-xl font-bold">Resonance</span>
             </div>
-            <div className="text-sm">© 2026 Resonance Team</div>
+            <div className="text-sm">
+              © 2026 Resonance Team • UNCP Music Department
+            </div>
           </div>
         </div>
       </footer>
