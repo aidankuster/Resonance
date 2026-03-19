@@ -12,6 +12,7 @@ import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
 import io.javalin.http.NotFoundResponse;
+import io.javalin.http.UnauthorizedResponse;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -42,44 +43,18 @@ public class ProfileEndpoint implements EndpointGroup {
 		}
 
 		if (!ctx.method().equals(HandlerType.POST)) {
-			// GET request - return profile with separated instruments and genres
-			JsonObject jsonResponse = new JsonObject();
-
-			// Add basic account info
-			jsonResponse.addProperty("id", account.id());
-			jsonResponse.addProperty("emailAddress", account.emailAddress());
-			jsonResponse.addProperty("enabled", account.enabled());
-			jsonResponse.addProperty("admin", account.admin());
-
-			// Add user info
-			JsonObject infoJson = new JsonObject();
-			infoJson.addProperty("displayName", account.info().displayName());
-			infoJson.addProperty("bio", account.info().bio());
-			infoJson.addProperty("availability", account.info().availability());
-			infoJson.addProperty("experienceLevel", account.info().experienceLevel().name());
-			jsonResponse.add("info", infoJson);
-
-			// Separate instruments and genres
-			JsonArray instrumentsArray = new JsonArray();
-			JsonArray genresArray = new JsonArray();
-
-			for (Tag tag : account.tags()) {
-				if (tag instanceof Instrument) {
-					instrumentsArray.add(tag.getName());
-				} else if (tag instanceof Genre) {
-					genresArray.add(tag.getName());
-				}
-			}
-
-			jsonResponse.add("instruments", instrumentsArray);
-			jsonResponse.add("genres", genresArray);
-
-			ctx.result(ConfigHolder.GSON.toJson(jsonResponse));
+			// GET request - return profile data
+			
+			ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
 			return;
 		}
 
 		// POST request - handle profile updates
-		// TODO: REQUIRE AUTHENTICATION TO EDIT PROFILE
+		// validate the session to make sure the user can only edit their own profile
+		if(Server.INSTANCE.getWebServer().getSessionHandler().validateSession(ctx).id() != account.id()) {
+			throw new UnauthorizedResponse("You cannot modify another user's profile");
+		}
+		
 		final String displayName = ctx.formParam("display_name");
 		final String bio = ctx.formParam("bio");
 		final String availability = ctx.formParam("availability");
@@ -120,39 +95,7 @@ public class ProfileEndpoint implements EndpointGroup {
 		account = mutableAccount.build();
 		Server.INSTANCE.getDatabaseManager().updateAccount(account).block();
 
-		// After update, return the updated profile with separated instruments and
-		// genres
-		JsonObject jsonResponse = new JsonObject();
-
-		// Add basic account info
-		jsonResponse.addProperty("id", account.id());
-		jsonResponse.addProperty("emailAddress", account.emailAddress());
-		jsonResponse.addProperty("enabled", account.enabled());
-		jsonResponse.addProperty("admin", account.admin());
-
-		// Add user info
-		JsonObject infoJson = new JsonObject();
-		infoJson.addProperty("displayName", account.info().displayName());
-		infoJson.addProperty("bio", account.info().bio());
-		infoJson.addProperty("availability", account.info().availability());
-		infoJson.addProperty("experienceLevel", account.info().experienceLevel().name());
-		jsonResponse.add("info", infoJson);
-
-		// Separate instruments and genres
-		JsonArray instrumentsArray = new JsonArray();
-		JsonArray genresArray = new JsonArray();
-
-		for (Tag tag : account.tags()) {
-			if (tag instanceof Instrument) {
-				instrumentsArray.add(tag.getName());
-			} else if (tag instanceof Genre) {
-				genresArray.add(tag.getName());
-			}
-		}
-
-		jsonResponse.add("instruments", instrumentsArray);
-		jsonResponse.add("genres", genresArray);
-
-		ctx.result(ConfigHolder.GSON.toJson(jsonResponse));
+		// After update, return the updated profile
+		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
 	}
 }

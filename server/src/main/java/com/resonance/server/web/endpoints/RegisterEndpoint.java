@@ -77,7 +77,10 @@ public class RegisterEndpoint implements EndpointGroup {
 			throw new InternalServerErrorResponse("Failed to create account");
 		}
 		
-		ctx.json(ConfigHolder.GSON.toJson(account.toJson(false)));
+		//save session
+		Server.INSTANCE.getWebServer().getSessionHandler().storeSession(account, ctx);
+		
+		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
 		ctx.status(200);
 	}
 }

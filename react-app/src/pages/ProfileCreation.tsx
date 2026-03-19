@@ -16,14 +16,15 @@ import {
 import {
   genresAPI,
   instrumentsAPI,
-  authAPI,
   profileAPI,
 } from "../services/api";
+import { useAuthContext } from "../contexts/AuthContext";
 import type { AccountFormData, ProfileFormData } from "../types/usertypes";
 import type { Genre, Instrument } from "../types/apitypes";
 
 function ProfileCreation() {
   const navigate = useNavigate();
+  const { register: registerUser, checkSession } = useAuthContext();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -287,7 +288,7 @@ function ProfileCreation() {
   const handleRegister = async () => {
     setIsSubmitting(true);
     try {
-      const response = await authAPI.register(
+      const response = await registerUser(
         accountData.email,
         accountData.password,
         accountData.confirmPassword,
@@ -352,14 +353,12 @@ function ProfileCreation() {
 
       console.log("Profile updated successfully:", response);
 
-      // Auto-login the user
-      try {
-        await authAPI.login(accountData.email, accountData.password);
-      } catch (loginError) {
-        console.warn("Auto-login failed, user can login manually:", loginError);
-      }
+      // Refresh the session to get updated user data with profile info
+      console.log("Refreshing session to get updated profile data...");
+      await checkSession();
+      console.log("Session refreshed, navigating to dashboard");
 
-      // Navigate to dashboard on success
+      // Navigate to dashboard with updated user data
       navigate("/dashboard");
     } catch (error: any) {
       console.error("Error updating profile:", error);

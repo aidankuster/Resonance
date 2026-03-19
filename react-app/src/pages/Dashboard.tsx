@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { profileAPI, authAPI } from "../services/api";
+import { profileAPI } from "../services/api";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
   Search,
@@ -41,8 +42,8 @@ interface BackendProfileResponse {
 
 function Dashboard() {
   const navigate = useNavigate();
+  const { user, logout, isAuthenticated, isLoading } = useAuthContext();
   const [activeTab, setActiveTab] = useState("discover");
-  const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState({
     name: "",
     instrument: "",
@@ -163,66 +164,50 @@ function Dashboard() {
     },
   ]);
 
-  // useEffect and other logic
+  // Redirect if user logs out
   useEffect(() => {
-    const loadUserProfile = async () => {
-      try {
-        const userId = localStorage.getItem("userId");
-        console.log("🔍 Loading profile for userId:", userId);
+    console.log('Dashboard auth check - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
+    if (!isAuthenticated && !isLoading) {
+      console.log('🔄 Redirecting to home page...');
+      navigate("/", { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
 
-        if (!userId) {
-          console.log("❌ No userId found, redirecting to login");
-          navigate("/userinitiation");
-          return;
-        }
+  // Load user profile from auth context (no API call needed)
+  useEffect(() => {
+    if (!user) {
+      console.log("No user found in auth context");
+      return;
+    }
 
-        console.log("📡 Fetching profile for ID:", parseInt(userId));
-        const profileData: BackendProfileResponse =
-          await profileAPI.getCurrentUserProfile(parseInt(userId));
+    console.log("Using user data from auth context:", user);
 
-        console.log("✅ Profile data received:", profileData);
+    // Calculate profile completion
+    let completion = 0;
+    if (user.info?.displayName) completion += 25;
+    if (user.instruments && user.instruments.length > 0) completion += 25;
+    if (user.genres && user.genres.length > 0) completion += 25;
+    if (user.info?.bio) completion += 25;
 
-        // Transform backend data to match component's expected format
-        setUserProfile({
-          name: profileData.info.displayName,
-          instrument:
-            profileData.instruments && profileData.instruments.length > 0
-              ? profileData.instruments.join(", ")
-              : "No instruments",
-          completion: calculateProfileCompletion(profileData),
-          profileViews: 0,
-          matches: 0,
-          email: profileData.emailAddress,
-        });
-      } catch (error) {
-        console.error("❌ Failed to load profile:", error);
-        // Log more details about error
-        if (error instanceof Error) {
-          console.error("Error message:", error.message);
-          console.error("Error stack:", error.stack);
-        }
-        authAPI.logout();
-        navigate("/userinitiation");
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Transform user data to match component's expected format
+    setUserProfile({
+      name: user.info?.displayName || 'User',
+      instrument: user.instruments && user.instruments.length > 0 ? user.instruments.join(", ") : "No instruments",
+      completion: completion,
+      profileViews: 0,
+      matches: 0,
+      email: user.emailAddress,
+    });
+  }, [user]);
 
-    loadUserProfile();
-  }, [navigate]);
-
-  const calculateProfileCompletion = (profile: BackendProfileResponse) => {
-    let completed = 0;
-    if (profile.info.displayName) completed += 25;
-    if (profile.instruments && profile.instruments.length > 0) completed += 25;
-    if (profile.genres && profile.genres.length > 0) completed += 25;
-    if (profile.info.bio) completed += 25;
-    return completed;
-  };
-
-  const handleLogout = () => {
-    authAPI.logout();
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // Force navigation with replace to clear history
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   const handleViewProfile = () => {
@@ -233,8 +218,8 @@ function Dashboard() {
     console.log("Generate flyer clicked");
   };
 
-  // Loading state
-  if (loading) {
+  // Loading state - use auth context's isLoading
+  if (isLoading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-amber-500"></div>

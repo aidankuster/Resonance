@@ -2,7 +2,10 @@ package com.resonance.server.data;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.resonance.server.Server;
 import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.data.tags.Genre;
+import com.resonance.server.data.tags.Instrument;
 import com.resonance.server.data.tags.Tag;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,20 +34,36 @@ public record UserAccount(
 	public JsonObject toJson(boolean sensitiveInfo) {
 		final JsonObject obj = new JsonObject();
 		obj.addProperty("id", this.id);
+		obj.addProperty("emailAddress", this.emailAddress);
 		
 		if(sensitiveInfo) {
-			obj.addProperty("email_address", this.emailAddress);
+			obj.addProperty("password", this.hashedPassword);
 		}
+		
+		obj.addProperty("enabled", this.enabled);
+		obj.addProperty("admin", this.admin);
 		
 		obj.add("info", this.info.toJson());
 		
-		final JsonArray tagsArray = new JsonArray();
-		for(Tag tag : this.tags) {
-			tagsArray.add(tag.getName());
+		// tags
+		final JsonArray instrumentsArray = new JsonArray();
+		final JsonArray genresArray = new JsonArray();
+		
+		for (Tag tag : this.tags()) {
+			if (tag instanceof Instrument) {
+				instrumentsArray.add(tag.getName());
+			} else if (tag instanceof Genre) {
+				genresArray.add(tag.getName());
+			}
 		}
-		obj.add("tags", tagsArray);
+		obj.add("instruments", instrumentsArray);
+		obj.add("genres", genresArray);
 		
 		return obj;
+	}
+	
+	public String createJWT() {
+		return Server.INSTANCE.getWebServer().getSessionHandler().generateJWT(this.toJson(true));
 	}
 	
 	public static class Mutable {
@@ -57,7 +76,7 @@ public record UserAccount(
 		private final UserInfo.Mutable info;
 		private final HashSet<Tag> tags = new HashSet<>();
 		
-		public Mutable(UserAccount user) {
+		Mutable(UserAccount user) {
 			this.id = user.id();
 			this.emailAddress = user.emailAddress();
 			this.hashedPassword = user.hashedPassword();
