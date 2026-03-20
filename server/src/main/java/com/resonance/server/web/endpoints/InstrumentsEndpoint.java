@@ -5,6 +5,7 @@ import com.resonance.server.Server;
 import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.tags.Instrument;
 import io.javalin.apibuilder.EndpointGroup;
+import io.javalin.http.ContentType;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import org.jetbrains.annotations.NotNull;
@@ -39,5 +40,6 @@ public class InstrumentsEndpoint implements EndpointGroup {
 		}
 		
 		ctx.result(ConfigHolder.GSON.toJson(array));
+		ctx.contentType(ContentType.APPLICATION_JSON);
 	}
 }

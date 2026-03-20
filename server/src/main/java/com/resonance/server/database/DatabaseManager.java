@@ -349,15 +349,17 @@ public class DatabaseManager implements AutoCloseable {
 					   if(i <= 0) {
 						   return Mono.error(new Exception("Failed to create project"));
 					   }
-					   
-					   return findProject(founderID, name).flatMap(project -> {
-						   
-						   // add founder to the project members list
-						   final Project.Mutable mutable = project.mutable();
-						   mutable.getMembers().add(new Project.Member(project.id(), founderID, "Founder"));
-						   
-						   return this.updateProject(mutable.build());
-					   });
+
+					   return findAccount(founderID).flatMap(founderAccount ->
+						   findProject(founderID, name).flatMap(project -> {
+
+							   // add founder to the project members list
+							   final Project.Mutable mutable = project.mutable();
+							   mutable.getMembers().add(new Project.Member(project.id(), founderAccount, "Founder"));
+
+							   return this.updateProject(mutable.build());
+						   })
+					   );
 				   }).onErrorMap(err -> {
 					if(err instanceof IntegrityConstraintViolationException) {
 						return new AlreadyExistsException();
@@ -404,7 +406,7 @@ public class DatabaseManager implements AutoCloseable {
 																	   .filter(Objects::nonNull)
 																	   .map(m -> row(
 																			   inline(project.id(), Integer.class),
-																			   inline(m.accountID(), Integer.class)
+																			   inline(m.account().id(), Integer.class)
 																	   ))
 																	   .toList();
 
@@ -419,7 +421,7 @@ public class DatabaseManager implements AutoCloseable {
 															 .filter(Objects::nonNull)
 															 .map(m -> row(
 																	 inline(project.id(), Integer.class),
-																	 inline(m.accountID(), Integer.class),
+																	 inline(m.account().id(), Integer.class),
 																	 inline(m.role(), String.class)
 															 ))
 															 .toList()
@@ -455,17 +457,25 @@ public class DatabaseManager implements AutoCloseable {
 		return getProjects(DSL.field("founder_id", Integer.class).eq(DSL.inline(founderID, Integer.class)));
 	}
 	
+	public Mono<Project> findProject(int projectID) {
+		return getProjects(DSL.field("project_id", Integer.class).eq(DSL.inline(projectID, Integer.class)))
+				.next();
+	}
+	
 	public Flux<Project> getProjects(Condition... conditions) {
 		return Flux.from(
 						this.dsl.selectFrom(
 								table("projects")
 										.leftJoin(table("project_members"))
 										.using(field("project_id", Integer.class))
+										.leftJoin(table("user_account"))
+										.on(field("project_members.account_id", Integer.class)
+												.eq(field("user_account.account_id", Integer.class)))
 										.leftJoin(table("user_account_info"))
 										.on(field("project_members.account_id", Integer.class)
 												.eq(field("user_account_info.account_id", Integer.class)))
 						).where(conditions))
-				.groupBy(record -> record.get(field("projects.project_id", Integer.class)))
+				.groupBy(record -> record.get(field("project_id", Integer.class)))
 				.flatMap(group -> group.collectList().mapNotNull(records -> {
 					if(records.isEmpty()) {
 						return null;
@@ -473,20 +483,48 @@ public class DatabaseManager implements AutoCloseable {
 
 					final Record first = records.getFirst();
 
-					final int projectID = first.get(field("projects.project_id", Integer.class));
-					final String name = first.get(field("projects.name", SQLDataType.VARCHAR));
+					final int projectID = first.get(field("project_id", Integer.class));
+					final String name = first.get(field("name", SQLDataType.VARCHAR));
 					final int founderID = first.get(field("founder_id", Integer.class));
 					final String description = first.get(field("description", SQLDataType.VARCHAR));
 					final String status = first.get(field("status", SQLDataType.VARCHAR));
 					final Date creationDate = first.get(field("creation_date", SQLDataType.DATE));
 
 					final Project.Member[] members = records.stream()
-							.filter(record -> record.get(field("project_members.account_id", Integer.class)) != null)
+							.filter(record -> record.get("email_address") != null)
 							.map(record -> {
-								final int accountID = record.get(field("project_members.account_id", Integer.class));
-								final String displayName = record.get(field("user_account_info.display_name", SQLDataType.VARCHAR));
-								final String role = record.get(field("role", SQLDataType.VARCHAR));
-								return new Project.Member(projectID, accountID, role);
+								final int accountID = record.get(8, Integer.class); // user_account.account_id is at index 8
+								final String email = record.get("email_address", String.class);
+								final String hashedPassword = record.get("password", String.class);
+								final boolean enabled = record.get("enabled", Boolean.class);
+								final boolean admin = record.get("admin", Boolean.class);
+
+								final String displayName = record.get("display_name", String.class);
+								final String bio = record.get("bio", String.class);
+								final String availability = record.get("availability", String.class);
+								final String expLevelStr = record.get("experience_level", String.class);
+
+								UserAccount.UserInfo.ExperienceLevel experienceLevel = UserAccount.UserInfo.ExperienceLevel.BEGINNER;
+								if(expLevelStr != null) {
+									try {
+										experienceLevel = UserAccount.UserInfo.ExperienceLevel.valueOf(expLevelStr);
+									} catch(IllegalArgumentException e) {
+										LOGGER.warn("Invalid experience level '{}' for user {}, defaulting to BEGINNER", expLevelStr, accountID);
+									}
+								}
+
+								final UserAccount userAccount = new UserAccount(
+										accountID,
+										email,
+										hashedPassword,
+										enabled,
+										admin,
+										new UserAccount.UserInfo(displayName, bio, availability, experienceLevel),
+										new Tag[0] // Tags are not needed for project members
+								);
+
+								final String role = record.get("role", String.class);
+								return new Project.Member(projectID, userAccount, role);
 							})
 							.toArray(Project.Member[]::new);
 

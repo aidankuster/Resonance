@@ -50,6 +50,6 @@ public class LoginEndpoint implements EndpointGroup {
 		
 		//success
 		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
-		ctx.status(200);
+		ctx.contentType(ContentType.APPLICATION_JSON);
 	}
 }

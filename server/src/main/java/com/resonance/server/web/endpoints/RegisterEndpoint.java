@@ -6,10 +6,7 @@ import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.exception.AlreadyExistsException;
 import io.javalin.apibuilder.EndpointGroup;
-import io.javalin.http.BadRequestResponse;
-import io.javalin.http.ConflictResponse;
-import io.javalin.http.Context;
-import io.javalin.http.InternalServerErrorResponse;
+import io.javalin.http.*;
 import org.jetbrains.annotations.NotNull;
 import reactor.core.Exceptions;
 
@@ -81,6 +78,6 @@ public class RegisterEndpoint implements EndpointGroup {
 		Server.INSTANCE.getWebServer().getSessionHandler().storeSession(account, ctx);
 		
 		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
-		ctx.status(200);
+		ctx.contentType(ContentType.APPLICATION_JSON);
 	}
 }

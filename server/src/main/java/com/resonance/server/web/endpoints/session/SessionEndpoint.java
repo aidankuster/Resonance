@@ -4,6 +4,7 @@ import com.resonance.server.Server;
 import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.UserAccount;
 import io.javalin.apibuilder.EndpointGroup;
+import io.javalin.http.ContentType;
 import io.javalin.http.Context;
 import org.jetbrains.annotations.NotNull;
 
@@ -31,6 +32,6 @@ public class SessionEndpoint implements EndpointGroup {
 		
 		//return profile info
 		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
-		ctx.status(200);
+		ctx.contentType(ContentType.APPLICATION_JSON);
 	}
 }

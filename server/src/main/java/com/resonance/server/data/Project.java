@@ -1,5 +1,6 @@
 package com.resonance.server.data;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import java.sql.Date;
@@ -19,16 +20,30 @@ public record Project(
 		Member[] members
 ) {
 	
-	//TODO: implement
 	public JsonObject toJson() {
-		return new JsonObject();
+		final JsonObject obj = new JsonObject();
+		
+		obj.addProperty("id", this.id);
+		obj.addProperty("name", this.name);
+		obj.addProperty("founderID", this.founderID);
+		obj.addProperty("description", this.description);
+		obj.addProperty("status", this.status);
+		obj.addProperty("creationDate", this.creationDate.toString());
+		
+		final JsonArray membersArray = new JsonArray();
+		for(Member member : this.members) {
+			membersArray.add(member.account.toJson(false));
+		}
+		obj.add("members", membersArray);
+		
+		return obj;
 	}
 	
 	public Mutable mutable() {
 		return new Mutable(this);
 	}
 	
-	public record Member(int projectID, int accountID, String role) {
+	public record Member(int projectID, UserAccount account, String role) {
 	
 	}
 	
