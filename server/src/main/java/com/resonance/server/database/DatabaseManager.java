@@ -6,6 +6,8 @@ import com.resonance.server.data.tags.Genre;
 import com.resonance.server.data.tags.Instrument;
 import com.resonance.server.data.tags.Tag;
 import com.resonance.server.exception.AlreadyExistsException;
+import com.resonance.server.data.Project;
+import com.resonance.server.data.ProjectRole;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
@@ -21,6 +23,7 @@ import reactor.core.publisher.Mono;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.jooq.impl.DSL.*;
 
@@ -417,6 +420,70 @@ public class DatabaseManager implements AutoCloseable {
 			created = true;
 		}
 
+		// Projects table
+		if (!existingTables.contains("projects")) {
+			dsl.createTable("projects")
+					.column("project_id", SQLDataType.INTEGER.identity(true))
+					.column("project_name", SQLDataType.VARCHAR(200).nullable(false))
+					.column("description", SQLDataType.CLOB)
+					.column("status", SQLDataType.VARCHAR(20).defaultValue("recruiting"))
+					.column("founder_id", SQLDataType.INTEGER.nullable(false))
+					.column("member_count", SQLDataType.INTEGER.defaultValue(1))
+					.column("created_at", SQLDataType.VARCHAR(50))
+					.constraints(
+							primaryKey("project_id"),
+							constraint("fk_project_founder")
+									.foreignKey("founder_id")
+									.references("user_account", "account_id"))
+					.execute();
+			created = true;
+		}
+
+		// Project roles table
+		if (!existingTables.contains("project_roles")) {
+			dsl.createTable("project_roles")
+					.column("role_id", SQLDataType.INTEGER.identity(true))
+					.column("project_id", SQLDataType.INTEGER.nullable(false))
+					.column("instrument", SQLDataType.VARCHAR(50).nullable(false))
+					.column("description", SQLDataType.VARCHAR(255))
+					.column("is_filled", SQLDataType.BOOLEAN.defaultValue(false))
+					.column("filled_by_user_id", SQLDataType.INTEGER)
+					.constraints(
+							primaryKey("role_id"),
+							constraint("fk_project_roles_project")
+									.foreignKey("project_id")
+									.references("projects", "project_id")
+									.onDeleteCascade(),
+							constraint("fk_project_roles_user")
+									.foreignKey("filled_by_user_id")
+									.references("user_account", "account_id"))
+					.execute();
+			created = true;
+		}
+
+		// Project members table
+		if (!existingTables.contains("project_members")) {
+			dsl.createTable("project_members")
+					.column("project_id", SQLDataType.INTEGER.nullable(false))
+					.column("user_id", SQLDataType.INTEGER.nullable(false))
+					.column("role_id", SQLDataType.INTEGER)
+					.column("joined_at", SQLDataType.VARCHAR(50))
+					.constraints(
+							primaryKey("project_id", "user_id"),
+							constraint("fk_project_members_project")
+									.foreignKey("project_id")
+									.references("projects", "project_id")
+									.onDeleteCascade(),
+							constraint("fk_project_members_user")
+									.foreignKey("user_id")
+									.references("user_account", "account_id"),
+							constraint("fk_project_members_role")
+									.foreignKey("role_id")
+									.references("project_roles", "role_id"))
+					.execute();
+			created = true;
+		}
+
 		return created;
 	}
 
@@ -448,4 +515,302 @@ public class DatabaseManager implements AutoCloseable {
 		insert.execute();
 	}
 
+	public Mono<Project> createProject(String projectName, String description,
+			String status, int founderId) {
+
+		System.out.println("\n=== DATABASE: Attempting to create project ===");
+		System.out.println("projectName: " + projectName);
+		System.out.println("description: " + description);
+		System.out.println("status: " + status);
+		System.out.println("founderId: " + founderId);
+
+		try {
+			// First, verify the founder exists
+			System.out.println("Verifying founder exists...");
+			UserAccount founder = findAccount(founderId).block();
+			if (founder == null) {
+				System.err.println("ERROR: Founder with ID " + founderId + " does not exist!");
+				return Mono.empty();
+			}
+
+			// Try a simple insert and catch any exception
+			try {
+				System.out.println("Attempting insert...");
+
+				// Build the insert statement
+				var insert = dsl.insertInto(table("projects"))
+						.columns(
+								field("project_name"),
+								field("description"),
+								field("status"),
+								field("founder_id"),
+								field("member_count"),
+								field("created_at"))
+						.values(
+								projectName,
+								description,
+								status,
+								founderId,
+								1,
+								java.time.Instant.now().toString());
+
+				// Log the SQL
+				System.out.println("SQL: " + insert.getSQL());
+
+				// Execute and get number of rows affected
+				int rowsAffected = insert.execute();
+				System.out.println("Rows affected: " + rowsAffected);
+
+				if (rowsAffected > 0) {
+					// Get the last inserted ID
+					var idResult = dsl.select(DSL.field("LAST_INSERT_ID()")).fetchOne();
+					if (idResult != null) {
+						int projectId = idResult.get(0, Integer.class);
+						System.out.println("✅ Project created with ID: " + projectId);
+						return getProject(projectId);
+					} else {
+						System.err.println("ERROR: Could not retrieve last insert ID");
+						return Mono.empty();
+					}
+				} else {
+					System.err.println("ERROR: No rows affected by insert");
+					return Mono.empty();
+				}
+
+			} catch (Exception e) {
+				System.err.println("❌ SQL Exception during insert: " + e.getMessage());
+				System.err.println("Exception type: " + e.getClass().getName());
+				e.printStackTrace();
+				return Mono.empty();
+			}
+
+		} catch (Exception e) {
+			System.err.println("EXCEPTION in createProject: " + e.getMessage());
+			e.printStackTrace();
+			return Mono.empty();
+		}
+	}
+
+	public Mono<Project> getProject(int projectId) {
+		System.out.println("=== DATABASE: Getting project " + projectId + " ===");
+		return Mono.from(
+				this.dsl.select(
+						field("p.project_id").as("project_id"),
+						field("p.project_name").as("project_name"),
+						field("p.description").as("description"),
+						field("p.status").as("status"),
+						field("p.founder_id").as("founder_id"),
+						field("p.member_count").as("member_count"),
+						field("p.created_at").as("created_at"),
+						field("u.display_name").as("founder_name"))
+						.from(table("projects").as("p"))
+						.leftJoin(table("user_account_info").as("u"))
+						.on(field("p.founder_id").eq(field("u.account_id")))
+						.where(field("p.project_id").eq(projectId)))
+				.map(record -> {
+					Project project = new Project();
+					// Use the aliased field names (without the "p." prefix)
+					project.id = record.get("project_id", Integer.class);
+					project.projectName = record.get("project_name", String.class);
+					project.description = record.get("description", String.class);
+					project.status = record.get("status", String.class);
+					project.founderId = record.get("founder_id", Integer.class);
+					project.founderName = record.get("founder_name", String.class);
+					project.memberCount = record.get("member_count", Integer.class);
+					project.createdAt = record.get("created_at", String.class);
+
+					System.out.println("Found project in DB: " + project.projectName + " with ID: " + project.id);
+
+					// Load roles
+					try {
+						List<ProjectRole> rolesList = getProjectRoles(projectId).collectList().block();
+						project.roles = rolesList != null ? rolesList : new ArrayList<>();
+						System.out.println("Loaded " + project.roles.size() + " roles for project");
+					} catch (Exception e) {
+						System.err.println("Error loading roles for project " + projectId + ": " + e.getMessage());
+						project.roles = new ArrayList<>();
+					}
+
+					return project;
+				});
+	}
+
+	public Flux<ProjectRole> getProjectRoles(int projectId) {
+		return Flux.from(
+				this.dsl.select(
+						field("role_id").as("role_id"),
+						field("project_id").as("project_id"),
+						field("instrument").as("instrument"),
+						field("description").as("description"),
+						field("is_filled").as("is_filled"),
+						field("filled_by_user_id").as("filled_by_user_id"))
+						.from(table("project_roles"))
+						.where(field("project_id").eq(inline(projectId, Integer.class))))
+				.map(record -> {
+					ProjectRole role = new ProjectRole();
+					role.id = record.get(field("role_id", Integer.class));
+					role.projectId = record.get(field("project_id", Integer.class));
+					role.instrument = record.get(field("instrument", String.class));
+					role.description = record.get(field("description", String.class));
+					role.isFilled = record.get(field("is_filled", Boolean.class));
+					role.filledByUserId = record.get(field("filled_by_user_id", Integer.class));
+					return role;
+				});
+	}
+
+	public Flux<Project> getAllProjects() {
+		return Flux.from(
+				this.dsl.select(
+						field("p.project_id").as("project_id"),
+						field("p.project_name").as("project_name"),
+						field("p.description").as("description"),
+						field("p.status").as("status"),
+						field("p.founder_id").as("founder_id"),
+						field("p.member_count").as("member_count"),
+						field("p.created_at").as("created_at"),
+						field("u.display_name").as("founder_name"))
+						.from(table("projects").as("p"))
+						.leftJoin(table("user_account_info").as("u"))
+						.on(field("p.founder_id").eq(field("u.account_id")))
+						.orderBy(field("p.created_at").desc()))
+				.map(record -> {
+					Project project = new Project();
+					// Use the aliased field names (without the "p." prefix)
+					project.id = record.get(field("project_id", Integer.class));
+					project.projectName = record.get(field("project_name", String.class));
+					project.description = record.get(field("description", String.class));
+					project.status = record.get(field("status", String.class));
+					project.founderId = record.get(field("founder_id", Integer.class));
+					project.memberCount = record.get(field("member_count", Integer.class));
+					project.createdAt = record.get(field("created_at", String.class));
+					project.founderName = record.get(field("founder_name", String.class));
+
+					// Load roles for each project
+					try {
+						List<ProjectRole> rolesList = getProjectRoles(project.id).collectList().block();
+						project.roles = rolesList != null ? rolesList : new ArrayList<>();
+					} catch (Exception e) {
+						System.err.println("Error loading roles for project " + project.id + ": " + e.getMessage());
+						project.roles = new ArrayList<>();
+					}
+
+					return project;
+				});
+	}
+
+	public Mono<ProjectRole> addProjectRole(int projectId, String instrument, String description) {
+		System.out.println("\n=== DATABASE: Adding role ===");
+		System.out.println("projectId: " + projectId);
+		System.out.println("instrument: " + instrument);
+		System.out.println("description: " + description);
+
+		try {
+			var insertStep = dsl.insertInto(table("project_roles"))
+					.columns(
+							field("project_id"),
+							field("instrument"),
+							field("description"),
+							field("is_filled"))
+					.values(
+							projectId,
+							instrument,
+							description,
+							false)
+					.returning(field("role_id"));
+
+			System.out.println("SQL: " + insertStep.getSQL());
+
+			var result = insertStep.fetchOne();
+			if (result != null) {
+				ProjectRole role = new ProjectRole();
+				role.id = result.get(field("role_id"), Integer.class);
+				role.projectId = projectId;
+				role.instrument = instrument;
+				role.description = description;
+				role.isFilled = false;
+				System.out.println("✅ Role added with ID: " + role.id);
+				return Mono.just(role);
+			} else {
+				System.err.println("❌ Failed to insert role - no result returned");
+				return Mono.empty();
+			}
+		} catch (Exception e) {
+			System.err.println("❌ ERROR adding role: " + e.getMessage());
+			e.printStackTrace();
+			return Mono.empty();
+		}
+	}
+
+	public Flux<UserAccount> getAllUsers() {
+		return Flux.from(
+				this.dsl.selectFrom(
+						table("user_account")
+								.leftJoin(table("user_account_info"))
+								.using(field("account_id", Integer.class))
+								.leftJoin(table("user_account_tags"))
+								.using(field("account_id", Integer.class))
+								.leftJoin(table("tags"))
+								.using(field("tag_id", Integer.class))))
+				.collectList().flatMapMany(records -> {
+					if (records.isEmpty()) {
+						return Flux.empty();
+					}
+
+					// Group records by user ID
+					Map<Integer, List<Record>> userRecords = records.stream()
+							.collect(Collectors.groupingBy(r -> r.get(field("account_id", SQLDataType.INTEGER))));
+
+					List<UserAccount> users = new ArrayList<>();
+
+					for (Map.Entry<Integer, List<Record>> entry : userRecords.entrySet()) {
+						List<Record> userRecs = entry.getValue();
+						Record first = userRecs.get(0);
+
+						int id = first.get(field("account_id", SQLDataType.INTEGER));
+						String email = first.get(field("email_address", SQLDataType.VARCHAR));
+						String hashedPassword = first.get(field("password", SQLDataType.VARCHAR));
+						boolean enabled = first.get(field("enabled", SQLDataType.BOOLEAN));
+						boolean admin = first.get(field("admin", SQLDataType.BOOLEAN));
+
+						String displayName = first.get(field("display_name", SQLDataType.VARCHAR));
+						String bio = first.get(field("bio", SQLDataType.VARCHAR));
+						String availability = first.get(field("availability", SQLDataType.VARCHAR));
+
+						String expLevelStr = first.get(field("experience_level", SQLDataType.VARCHAR));
+						UserAccount.UserInfo.ExperienceLevel experienceLevel = UserAccount.UserInfo.ExperienceLevel.BEGINNER;
+
+						if (expLevelStr != null) {
+							try {
+								experienceLevel = UserAccount.UserInfo.ExperienceLevel.valueOf(expLevelStr);
+							} catch (IllegalArgumentException e) {
+								// Use default
+							}
+						}
+
+						HashSet<Tag> tags = new HashSet<>();
+						for (Record record : userRecs) {
+							Integer tagID = record.get(field("tag_id", Integer.class));
+							String tagName = record.get(field("name", SQLDataType.VARCHAR));
+
+							if (tagID == null || tagName == null)
+								continue;
+
+							Tag.Type type = Tag.Type.valueOf(record.get(field("type", SQLDataType.VARCHAR)));
+
+							if (type.equals(Tag.Type.INSTRUMENT)) {
+								tags.add(new Instrument(tagID, tagName));
+							} else if (type.equals(Tag.Type.GENRE)) {
+								tags.add(new Genre(tagID, tagName));
+							}
+						}
+
+						users.add(new UserAccount(
+								id, email, hashedPassword, enabled, admin,
+								new UserAccount.UserInfo(displayName, bio, availability, experienceLevel),
+								tags.toArray(Tag[]::new)));
+					}
+
+					return Flux.fromIterable(users);
+				});
+	}
 }

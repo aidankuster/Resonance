@@ -72,6 +72,8 @@ public class WebServer {
 		this.endpoints.add(new GenresEndpoint());
 		this.endpoints.add(new InstrumentsEndpoint());
 		this.endpoints.add(new ProfileEndpoint());
+		this.endpoints.add(new ProjectEndpoint());
+		this.endpoints.add(new SearchEndpoint());
 	}
 
 }

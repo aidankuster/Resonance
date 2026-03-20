@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Music,
@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   SlidersHorizontal,
 } from "lucide-react";
+import { searchAPI, type SearchResultUser } from "../services/api";
 
 function SearchResults() {
   const navigate = useNavigate();
@@ -19,95 +20,13 @@ function SearchResults() {
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [showFilters, setShowFilters] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResultUser[]>([]);
   const [filters, setFilters] = useState({
     instrument: "",
     genre: "",
     experienceLevel: "",
   });
-
-  // Mock search results
-  const [searchResults] = useState([
-    {
-      id: 1,
-      name: "Alex Chen",
-      instrument: "Piano, Guitar",
-      genres: ["Jazz", "Fusion", "Classical"],
-      match: 95,
-      status: "Available",
-      bio: "Jazz pianist looking for fusion projects",
-      profileViews: 42,
-    },
-    {
-      id: 2,
-      name: "Maya Rodriguez",
-      instrument: "Violin",
-      genres: ["Classical", "Folk", "Latin"],
-      match: 92,
-      status: "Open to collab",
-      bio: "Classical violinist interested in cross-genre collaboration",
-      profileViews: 38,
-    },
-    {
-      id: 3,
-      name: "Jamie Lee",
-      instrument: "Bass",
-      genres: ["Jazz", "Funk", "Rock"],
-      match: 88,
-      status: "Looking for band",
-      bio: "Bass player with 10 years experience in jazz and funk",
-      profileViews: 27,
-    },
-    {
-      id: 4,
-      name: "Riley Patel",
-      instrument: "Drums",
-      genres: ["Rock", "Metal", "Fusion"],
-      match: 85,
-      status: "Available",
-      bio: "Drummer seeking progressive rock projects",
-      profileViews: 31,
-    },
-    {
-      id: 5,
-      name: "Taylor Kim",
-      instrument: "Saxophone",
-      genres: ["Jazz", "Blues", "Funk"],
-      match: 82,
-      status: "Open to collab",
-      bio: "Saxophonist specialized in jazz and blues",
-      profileViews: 19,
-    },
-    {
-      id: 6,
-      name: "Casey Jordan",
-      instrument: "Vocals",
-      genres: ["R&B", "Soul", "Pop"],
-      match: 79,
-      status: "Available",
-      bio: "Vocalist looking for R&B and soul projects",
-      profileViews: 24,
-    },
-    {
-      id: 7,
-      name: "Morgan Wells",
-      instrument: "Cello",
-      genres: ["Classical", "Folk", "Indie"],
-      match: 76,
-      status: "Open to collab",
-      bio: "Cellist interested in indie folk collaborations",
-      profileViews: 16,
-    },
-    {
-      id: 8,
-      name: "Jordan Smith",
-      instrument: "Trumpet",
-      genres: ["Jazz", "Latin", "Funk"],
-      match: 74,
-      status: "Available",
-      bio: "Jazz trumpet player open to various projects",
-      profileViews: 21,
-    },
-  ]);
 
   const instruments = [
     "All Instruments",
@@ -120,6 +39,12 @@ function SearchResults() {
     "Bass",
     "Cello",
     "Trumpet",
+    "Flute",
+    "Clarinet",
+    "Viola",
+    "Harp",
+    "Synthesizer",
+    "Ukulele",
   ];
 
   const genreOptions = [
@@ -134,21 +59,53 @@ function SearchResults() {
     "Latin",
     "Folk",
     "Metal",
+    "Blues",
+    "Country",
+    "Electronic",
+    "Hip Hop",
+    "Pop",
   ];
 
   const experienceLevels = [
     "All Levels",
-    "Beginner",
-    "Intermediate",
-    "Advanced",
-    "Professional",
+    "BEGINNER",
+    "INTERMEDIATE",
+    "ADVANCED",
+    "PROFESSIONAL",
   ];
+
+  // Perform search when component mounts or filters change
+  useEffect(() => {
+    performSearch();
+  }, [location.search]); // Re-run when URL query changes
+
+  const performSearch = async () => {
+    setLoading(true);
+    try {
+      const results = await searchAPI.searchUsers({
+        query: initialQuery || undefined,
+        instrument: filters.instrument || undefined,
+        genre: filters.genre || undefined,
+        experienceLevel: filters.experienceLevel || undefined,
+      });
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search failed:", error);
+      // Show error message to user
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     // Update URL with search query
     navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-    // should fetch new results here
+  };
+
+  const handleApplyFilters = () => {
+    setShowFilters(false);
+    performSearch();
   };
 
   const clearFilters = () => {
@@ -157,6 +114,8 @@ function SearchResults() {
       genre: "",
       experienceLevel: "",
     });
+    // Re-run search with cleared filters
+    setTimeout(() => performSearch(), 0);
   };
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
@@ -240,7 +199,9 @@ function SearchResults() {
               )}
             </button>
             <p className="text-sm text-gray-400">
-              {searchResults.length} results found
+              {loading
+                ? "Searching..."
+                : `${searchResults.length} results found`}
             </p>
           </div>
         </div>
@@ -333,7 +294,7 @@ function SearchResults() {
                 </div>
 
                 <button
-                  onClick={() => setShowFilters(false)}
+                  onClick={handleApplyFilters}
                   className="w-full bg-amber-600 hover:bg-amber-700 py-3 rounded-xl font-medium transition"
                 >
                   Apply Filters
@@ -344,87 +305,94 @@ function SearchResults() {
 
           {/* Results Grid */}
           <main className={`flex-1 ${showFilters ? "" : "max-w-6xl mx-auto"}`}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {searchResults.map((musician) => (
-                <div
-                  key={musician.id}
-                  className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800 hover:border-amber-500/30 transition group cursor-pointer"
-                  onClick={() => navigate(`/profile/${musician.id}`)}
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-12 w-12 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-full flex items-center justify-center">
-                        <User className="h-6 w-6 text-amber-400" />
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {searchResults.map((musician) => (
+                  <div
+                    key={musician.id}
+                    className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800 hover:border-amber-500/30 transition group cursor-pointer"
+                    onClick={() => navigate(`/profile/${musician.id}`)}
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-12 w-12 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-full flex items-center justify-center">
+                          <User className="h-6 w-6 text-amber-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-lg">
+                            {musician.displayName}
+                          </h3>
+                          <p className="text-amber-400 text-sm">
+                            {musician.instruments.join(", ")}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-bold text-lg">{musician.name}</h3>
-                        <p className="text-amber-400 text-sm">
-                          {musician.instrument}
-                        </p>
+                      {musician.matchPercentage && (
+                        <div className="flex items-center gap-1 bg-green-900/30 text-green-400 px-3 py-1 rounded-full text-sm">
+                          {musician.matchPercentage}% match
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-gray-300 text-sm mb-3 line-clamp-2">
+                      {musician.bio}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {musician.genres.map((genre, idx) => (
+                        <span
+                          key={idx}
+                          className="bg-amber-500/10 text-amber-300 px-3 py-1 rounded-full text-xs"
+                        >
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-500 capitalize">
+                          {musician.experienceLevel.toLowerCase()}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            console.log("Save", musician.id);
+                          }}
+                          className="p-2 hover:bg-gray-800 rounded-full transition"
+                        >
+                          <Heart className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            console.log("View", musician.id);
+                          }}
+                          className="p-2 hover:bg-gray-800 rounded-full transition"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 bg-green-900/30 text-green-400 px-3 py-1 rounded-full text-sm">
-                      {musician.match}% match
-                    </div>
                   </div>
-
-                  <p className="text-gray-300 text-sm mb-3 line-clamp-2">
-                    {musician.bio}
-                  </p>
-
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {musician.genres.map((genre, idx) => (
-                      <span
-                        key={idx}
-                        className="bg-amber-500/10 text-amber-300 px-3 py-1 rounded-full text-xs"
-                      >
-                        {genre}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-800">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-400">
-                        {musician.status}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {musician.profileViews} views
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log("Save", musician.id);
-                        }}
-                        className="p-2 hover:bg-gray-800 rounded-full transition"
-                      >
-                        <Heart className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log("View", musician.id);
-                        }}
-                        className="p-2 hover:bg-gray-800 rounded-full transition"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* No Results State */}
-            {searchResults.length === 0 && (
+            {!loading && searchResults.length === 0 && (
               <div className="text-center py-20">
                 <div className="bg-gray-900/30 rounded-2xl p-12 max-w-md mx-auto">
                   <Search className="h-16 w-16 text-gray-600 mx-auto mb-4" />
                   <h3 className="text-2xl font-bold mb-2">No results found</h3>
                   <p className="text-gray-400 mb-6">
-                    We couldn't find any musicians matching "{initialQuery}"
+                    We couldn't find any musicians matching your criteria
                   </p>
                   <button
                     onClick={() => {
@@ -434,6 +402,7 @@ function SearchResults() {
                         genre: "",
                         experienceLevel: "",
                       });
+                      navigate("/search");
                     }}
                     className="bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-full font-medium transition"
                   >

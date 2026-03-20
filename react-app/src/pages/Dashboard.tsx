@@ -430,7 +430,10 @@ function Dashboard() {
                     activity.
                   </p>
                 </div>
-                <button className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition">
+                <button
+                  onClick={() => navigate("/create-project")}
+                  className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition transform hover:scale-105"
+                >
                   <Plus className="h-5 w-5" />
                   New Project
                 </button>

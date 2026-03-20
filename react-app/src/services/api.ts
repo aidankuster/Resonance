@@ -49,6 +49,45 @@ export interface ProfileResponse {
   instruments: string[];  
   genres: string[];       
 }
+
+export interface SearchFilters {
+  query?: string;
+  instrument?: string;
+  genre?: string;
+  experienceLevel?: string;
+}
+
+export interface SearchResultUser {
+  id: number;
+  displayName: string;
+  instruments: string[];
+  genres: string[];
+  experienceLevel: string;
+  bio: string;
+  profileViews?: number;
+  matchPercentage?: number;
+}
+
+export const searchAPI = {
+  searchUsers: async (filters: SearchFilters): Promise<SearchResultUser[]> => {
+    // Build query string from filters
+    const params = new URLSearchParams();
+    if (filters.query) params.append('q', filters.query);
+    if (filters.instrument) params.append('instrument', filters.instrument);
+    if (filters.genre) params.append('genre', filters.genre);
+    if (filters.experienceLevel) params.append('experienceLevel', filters.experienceLevel);
+    
+    const response = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Search failed: ${errorText}`);
+    }
+    
+    return response.json();
+  }
+};
+
 // Generic fetch wrapper for JSON responses
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
