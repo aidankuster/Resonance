@@ -1,6 +1,8 @@
 package com.resonance.server.database;
 
+import com.resonance.server.Server;
 import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.data.Project;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.data.tags.Genre;
 import com.resonance.server.data.tags.Instrument;
@@ -21,6 +23,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -45,13 +48,14 @@ public class DatabaseManager implements AutoCloseable {
 	private final Connection connection;
 	private final DSLContext dsl;
 
-	public DatabaseManager() {
+	public DatabaseManager(Server server) {
 
 		final ConfigHolder<DatabaseConfig> configHolder = new ConfigHolder<>("database", DatabaseConfig.class);
 
 		try {
 			this.config = configHolder.loadConfig();
 		} catch (Exception ex) {
+			LOGGER.error("Failed to load database config", ex);
 			throw new RuntimeException("Failed to load database config", ex);
 		}
 
@@ -75,7 +79,7 @@ public class DatabaseManager implements AutoCloseable {
 				// Check if database exists, create if it doesn't
 				var stmt = baseConnection.createStatement();
 				stmt.executeUpdate("CREATE DATABASE IF NOT EXISTS " + this.config.database);
-				System.out.println("Ensured database '" + this.config.database + "' exists");
+				LOGGER.info("Ensured database '{}' exists", this.config.database);
 			}
 
 			// Now connect to the specific database
@@ -87,16 +91,17 @@ public class DatabaseManager implements AutoCloseable {
 					this.config.database);
 
 			this.connection = DriverManager.getConnection(url, this.config.username, this.config.password);
-			System.out.println("Connected to database: " + this.config.database);
+			LOGGER.info("Connected to database: {}", this.config.database);
 
 		} catch (Exception e) {
+			LOGGER.error("Failed to connect to database", e);
 			throw new RuntimeException("Failed to connect to database", e);
 		}
 
 		this.dsl = DSL.using(this.connection, this.config.dialect);
 
 		if (this.initializeDefaultTables(this.dsl)) {
-			System.out.println("Created initial database tables");
+			LOGGER.info("Created initial database tables");
 		}
 	}
 
@@ -110,44 +115,44 @@ public class DatabaseManager implements AutoCloseable {
 	 * @return a Mono of the {@link UserAccount} if it was created.
 	 */
 	public Mono<UserAccount> createAccount(String emailAddress, String hashedPassword, boolean enabled, boolean admin) {
-		return Mono.from(
-				this.dsl.insertInto(
-						table("user_account")).columns(
-								field("email_address"),
-								field("password"),
-								field("enabled"),
-								field("admin"))
-						.values(
-								DSL.inline(emailAddress, String.class),
-								DSL.inline(hashedPassword, String.class),
-								DSL.inline(enabled, Boolean.class),
-								DSL.inline(admin, Boolean.class)))
+		return Mono.from(this.dsl.insertInto(
+				table("user_account")).columns(
+						field("email_address"),
+						field("password"),
+						field("enabled"),
+						field("admin"))
+				.values(
+						DSL.inline(emailAddress, String.class),
+						DSL.inline(hashedPassword, String.class),
+						DSL.inline(enabled, Boolean.class),
+						DSL.inline(admin, Boolean.class)))
 				.flatMap((i) -> {
-					if (i > 0) { // if row was actually created
-
-						return findAccount(emailAddress).flatMap(account -> {
-
-							// create a row in user_account_info table as well
-							final Mono<Integer> accountInfo = Mono.from(
-									this.dsl.insertInto(
-											table("user_account_info")).columns(
-													field("account_id"),
-													field("display_name"),
-													field("bio"),
-													field("availability"),
-													field("experience_level"))
-											.values(
-													inline(account.id(), Integer.class),
-													inline(account.info().displayName(), String.class),
-													inline(account.info().bio(), String.class),
-													inline(account.info().availability(), String.class),
-													inline(account.info().experienceLevel(),
-															UserAccount.UserInfo.ExperienceLevel.class)));
-
-							return accountInfo.then(Mono.just(account));
-						});
+					if (i <= 0) {
+						return Mono.error(new AlreadyExistsException());
 					}
-					return Mono.error(new AlreadyExistsException());
+
+					// if row was actually created
+					return findAccount(emailAddress).flatMap(account -> {
+
+						// create a row in user_account_info table as well
+						final Mono<Integer> accountInfo = Mono.from(
+								this.dsl.insertInto(
+										table("user_account_info")).columns(
+												field("account_id"),
+												field("display_name"),
+												field("bio"),
+												field("availability"),
+												field("experience_level"))
+										.values(
+												inline(account.id(), Integer.class),
+												inline(account.info().displayName(), String.class),
+												inline(account.info().bio(), String.class),
+												inline(account.info().availability(), String.class),
+												inline(
+														account.info().experienceLevel(),
+														UserAccount.UserInfo.ExperienceLevel.class)));
+						return accountInfo.then(Mono.just(account));
+					});
 				}).onErrorMap(err -> {
 					if (err instanceof IntegrityConstraintViolationException) {
 						return new AlreadyExistsException();
@@ -200,7 +205,8 @@ public class DatabaseManager implements AutoCloseable {
 							.set(field("display_name"), inline(info.displayName(), String.class))
 							.set(field("bio"), inline(info.bio(), String.class))
 							.set(field("availability"), inline(info.availability(), String.class))
-							.set(field("experience_level"),
+							.set(
+									field("experience_level"),
 									inline(info.experienceLevel(), UserAccount.UserInfo.ExperienceLevel.class));
 
 					// replace tags
@@ -273,7 +279,8 @@ public class DatabaseManager implements AutoCloseable {
 						try {
 							experienceLevel = UserAccount.UserInfo.ExperienceLevel.valueOf(expLevelStr);
 						} catch (IllegalArgumentException e) {
-							LOGGER.warn("Invalid experience level '{}' for user {}, defaulting to BEGINNER",
+							LOGGER.warn(
+									"Invalid experience level '{}' for user {}, defaulting to BEGINNER",
 									expLevelStr, id);
 							// already defaulted to BEGINNER
 						}
@@ -308,6 +315,201 @@ public class DatabaseManager implements AutoCloseable {
 							new UserAccount.UserInfo(displayName, bio, availability, experienceLevel),
 							tags.toArray(Tag[]::new)));
 				});
+	}
+
+	public Mono<Project> createProject(int founderID, String name, String description) {
+		return Mono.from(this.dsl.insertInto(
+				table("projects")).columns(
+						field("name"),
+						field("founder_id"),
+						field("description"),
+						field("status"))
+				.values(
+						DSL.inline(name, String.class),
+						DSL.inline(founderID, int.class),
+						DSL.inline(description, String.class),
+						DSL.inline("Planning", String.class)))
+				.flatMap((i) -> {
+					if (i <= 0) {
+						return Mono.error(new Exception("Failed to create project"));
+					}
+
+					return findAccount(founderID)
+							.flatMap(founderAccount -> findProject(founderID, name).flatMap(project -> {
+
+								// add founder to the project members list
+								final Project.Mutable mutable = project.mutable();
+								mutable.getMembers().add(new Project.Member(project.id(), founderAccount, "Founder"));
+
+								return this.updateProject(mutable.build());
+							}));
+				}).onErrorMap(err -> {
+					if (err instanceof IntegrityConstraintViolationException) {
+						return new AlreadyExistsException();
+					}
+					return err;
+				});
+	}
+
+	public Mono<Project> updateProject(Project project) {
+		return Mono.from(
+				this.dsl.transactionPublisher(conf -> {
+					final DSLContext tx = using(conf);
+
+					// update projects row
+					final var upsertProject = tx.insertInto(table("projects"))
+							.columns(
+									field("project_id"),
+									field("name"),
+									field("founder_id"),
+									field("description"),
+									field("status"),
+									field("creation_date"))
+							.values(
+									inline(project.id(), Integer.class),
+									inline(project.name(), String.class),
+									inline(project.founderID(), Integer.class),
+									inline(project.description(), String.class),
+									inline(project.status(), String.class),
+									inline(project.creationDate(), java.sql.Date.class))
+							.onDuplicateKeyUpdate()
+							.set(field("name"), inline(project.name(), String.class))
+							.set(field("founder_id"), inline(project.founderID(), Integer.class))
+							.set(field("description"), inline(project.description(), String.class))
+							.set(field("status"), inline(project.status(), String.class))
+							.set(field("creation_date"), inline(project.creationDate(), java.sql.Date.class));
+
+					// update project members
+					final var deleteMembers = tx.deleteFrom(table("project_members"))
+							.where(field("project_id", Integer.class).eq(inline(project.id(), Integer.class)));
+
+					final List<Row2<Integer, Integer>> memberRows = Arrays.stream(project.members())
+							.filter(Objects::nonNull)
+							.map(m -> row(
+									inline(project.id(), Integer.class),
+									inline(m.account().id(), Integer.class)))
+							.toList();
+
+					final var insertMembers = tx.insertInto(table("project_members"))
+							.columns(
+									field("project_id", Integer.class),
+									field("account_id", Integer.class),
+									field("role", String.class))
+							.valuesOfRows(
+									Arrays.stream(project.members())
+											.filter(Objects::nonNull)
+											.map(m -> row(
+													inline(project.id(), Integer.class),
+													inline(m.account().id(), Integer.class),
+													inline(m.role(), String.class)))
+											.toList());
+
+					return Flux.concat(
+							Mono.from(upsertProject).then(),
+							Mono.from(deleteMembers).then(),
+							memberRows.isEmpty() ? Mono.empty() : Mono.from(insertMembers).then());
+				})).then(Mono.just(project));
+	}
+
+	/**
+	 * Finds a specific project by a user
+	 *
+	 * @param founderID
+	 * @param name
+	 * @return
+	 */
+	public Mono<Project> findProject(int founderID, String name) {
+		return this.findProjects(founderID)
+				.filter(project -> project.name().equals(name))
+				.next();
+	}
+
+	/**
+	 * Find all projects created by a user
+	 * 
+	 * @param founderID
+	 * @return
+	 */
+	public Flux<Project> findProjects(int founderID) {
+		return getProjects(DSL.field("founder_id", Integer.class).eq(DSL.inline(founderID, Integer.class)));
+	}
+
+	public Mono<Project> findProject(int projectID) {
+		return getProjects(DSL.field("project_id", Integer.class).eq(DSL.inline(projectID, Integer.class)))
+				.next();
+	}
+
+	public Flux<Project> getProjects(Condition... conditions) {
+		return Flux.from(
+				this.dsl.selectFrom(
+						table("projects")
+								.leftJoin(table("project_members"))
+								.using(field("project_id", Integer.class))
+								.leftJoin(table("user_account"))
+								.on(field("project_members.account_id", Integer.class)
+										.eq(field("user_account.account_id", Integer.class)))
+								.leftJoin(table("user_account_info"))
+								.on(field("project_members.account_id", Integer.class)
+										.eq(field("user_account_info.account_id", Integer.class))))
+						.where(conditions))
+				.groupBy(record -> record.get(field("project_id", Integer.class)))
+				.flatMap(group -> group.collectList().mapNotNull(records -> {
+					if (records.isEmpty()) {
+						return null;
+					}
+
+					final Record first = records.getFirst();
+
+					final int projectID = first.get(field("project_id", Integer.class));
+					final String name = first.get(field("name", SQLDataType.VARCHAR));
+					final int founderID = first.get(field("founder_id", Integer.class));
+					final String description = first.get(field("description", SQLDataType.VARCHAR));
+					final String status = first.get(field("status", SQLDataType.VARCHAR));
+					final Date creationDate = first.get(field("creation_date", SQLDataType.DATE));
+
+					final Project.Member[] members = records.stream()
+							.filter(record -> record.get("email_address") != null)
+							.map(record -> {
+								final int accountID = record.get(8, Integer.class); // user_account.account_id is at
+																					// index 8
+								final String email = record.get("email_address", String.class);
+								final String hashedPassword = record.get("password", String.class);
+								final boolean enabled = record.get("enabled", Boolean.class);
+								final boolean admin = record.get("admin", Boolean.class);
+
+								final String displayName = record.get("display_name", String.class);
+								final String bio = record.get("bio", String.class);
+								final String availability = record.get("availability", String.class);
+								final String expLevelStr = record.get("experience_level", String.class);
+
+								UserAccount.UserInfo.ExperienceLevel experienceLevel = UserAccount.UserInfo.ExperienceLevel.BEGINNER;
+								if (expLevelStr != null) {
+									try {
+										experienceLevel = UserAccount.UserInfo.ExperienceLevel.valueOf(expLevelStr);
+									} catch (IllegalArgumentException e) {
+										LOGGER.warn("Invalid experience level '{}' for user {}, defaulting to BEGINNER",
+												expLevelStr, accountID);
+									}
+								}
+
+								final UserAccount userAccount = new UserAccount(
+										accountID,
+										email,
+										hashedPassword,
+										enabled,
+										admin,
+										new UserAccount.UserInfo(displayName, bio, availability, experienceLevel),
+										new Tag[0] // Tags are not needed for project members
+								);
+
+								final String role = record.get("role", String.class);
+								return new Project.Member(projectID, userAccount, role);
+							})
+							.toArray(Project.Member[]::new);
+
+					return new Project(projectID, name, founderID, description, status, creationDate, members);
+				}))
+				.filter(Objects::nonNull);
 	}
 
 	public Flux<Tag> getTags(Condition... conditions) {
@@ -379,7 +581,8 @@ public class DatabaseManager implements AutoCloseable {
 					.column("display_name", SQLDataType.VARCHAR(128))
 					.column("bio", SQLDataType.VARCHAR(255))
 					.column("availability", SQLDataType.VARCHAR(255))
-					.column("experience_level",
+					.column(
+							"experience_level",
 							SQLDataType.VARCHAR.asEnumDataType(UserAccount.UserInfo.ExperienceLevel.class))
 					.constraints(
 							primaryKey("account_id"),
@@ -416,6 +619,25 @@ public class DatabaseManager implements AutoCloseable {
 							constraint("fk_account_tags_tag_id")
 									.foreignKey("tag_id")
 									.references("tags", "tag_id"))
+					.execute();
+			created = true;
+		}
+
+		if (!existingTables.contains("projects")) {
+			dsl.createTable("projects")
+					.column("project_id", SQLDataType.INTEGER.identity(true))
+					.column("name", SQLDataType.VARCHAR(255))
+					.column("founder_id", SQLDataType.INTEGER)
+					.column("description", SQLDataType.VARCHAR(255))
+					.column("status", SQLDataType.VARCHAR(32))
+					.column("creation_date", SQLDataType.DATE.defaultValue(currentDate()))
+					.constraints(
+							primaryKey("project_id"),
+							constraint("fk_founder_account_id")
+									.foreignKey("founder_id")
+									.references("user_account", "account_id"),
+							unique("name", "founder_id") // unique project name per founder
+					)
 					.execute();
 			created = true;
 		}

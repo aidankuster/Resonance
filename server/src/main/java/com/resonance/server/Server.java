@@ -56,8 +56,8 @@ public class Server {
 	private final WebServer webServer;
 	
 	public Server() {
-		this.databaseManager = new DatabaseManager();
-		this.webServer = new WebServer();
+		this.databaseManager = new DatabaseManager(this);
+		this.webServer = new WebServer(this);
 	}
 	
 	public DatabaseManager getDatabaseManager() {

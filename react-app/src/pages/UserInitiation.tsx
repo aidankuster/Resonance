@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Music,
@@ -10,10 +10,11 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { authAPI } from "../services/api";
+import { useAuthContext } from "../contexts/AuthContext";
 
 function UserInitiation() {
   const navigate = useNavigate();
+  const { login, isAuthenticated, isLoading } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,14 +65,21 @@ function UserInitiation() {
     return isValid;
   };
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      navigate("/dashboard");
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateLogin()) return;
 
     setIsSubmitting(true);
     try {
-      const response = await authAPI.login(loginData.email, loginData.password);
-      console.log("Login successful:", response);
+      await login(loginData.email, loginData.password);
+      console.log("Login successful");
       navigate("/dashboard");
     } catch (error: any) {
       console.error("Login failed:", error);
@@ -83,6 +91,18 @@ function UserInitiation() {
       setIsSubmitting(false);
     }
   };
+
+  // Show loading state while checking session
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <Music className="h-16 w-16 text-amber-500 mx-auto mb-4 animate-pulse" />
+          <p className="text-xl text-gray-300">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white">

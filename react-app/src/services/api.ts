@@ -7,8 +7,8 @@ export interface ProfileCreateResponse {
 }
 
 export interface LoginResponse {
-  id: number;              // Backend returns "id", not "userId"
-  emailAddress: string;     // Backend returns "emailAddress", not "email"
+  id: number;
+  emailAddress: string;
   enabled: boolean;
   admin: boolean;
   info?: {
@@ -17,12 +17,13 @@ export interface LoginResponse {
     availability: string;
     experienceLevel: string;
   };
-  tags?: string[];
+  instruments?: string[];
+  genres?: string[];
 }
 
 export interface RegisterResponse {
-  id: number;              // Backend returns "id", not "userId"
-  emailAddress: string;     // Backend returns "emailAddress", not "email"
+  id: number;
+  emailAddress: string;
   enabled: boolean;
   admin: boolean;
   info?: {
@@ -31,7 +32,8 @@ export interface RegisterResponse {
     availability: string;
     experienceLevel: string;
   };
-  tags?: string[];
+  instruments?: string[];
+  genres?: string[];
   message?: string;
 }
 
@@ -94,14 +96,15 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // Include cookies in requests
     ...options,
   });
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`API error (${response.status}): ${errorText}`);
   }
-  
+
   return response.json();
 }
 
@@ -110,13 +113,14 @@ async function fetchFormData<T>(endpoint: string, formData: FormData, method: st
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method,
     body: formData,
+    credentials: 'include', // Include cookies in requests
   });
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`API error (${response.status}): ${errorText}`);
   }
-  
+
   return response.json();
 }
 
@@ -154,35 +158,40 @@ export const authAPI = {
     const formData = new FormData();
     formData.append('email', email);
     formData.append('password', password);
-    
-    const data = await fetchFormData<LoginResponse>('/api/login', formData, 'POST');
-    
-    // Backend returns "id", not "userId"
-    if (data.id) {
-      localStorage.setItem('userId', data.id.toString());
-    }
-    
-    return data;
+
+    return await fetchFormData<LoginResponse>('/api/login', formData, 'POST');
   },
-  
+
   register: async (email: string, password: string, confirmPassword: string): Promise<RegisterResponse> => {
     const formData = new FormData();
     formData.append('email', email);
     formData.append('password', password);
     formData.append('password2', confirmPassword);
-    
-    const data = await fetchFormData<RegisterResponse>('/api/register', formData, 'POST');
-    
-    // Backend returns "id", not "userId"
-    if (data.id) {
-      localStorage.setItem('userId', data.id.toString());
-    }
-    
-    return data;
+
+    return await fetchFormData<RegisterResponse>('/api/register', formData, 'POST');
   },
-  
-  logout: () => {
-    localStorage.removeItem('userId');
-    localStorage.removeItem('authToken');
+
+  // Check if user has an active session via JWT cookie
+  checkSession: async (): Promise<LoginResponse | null> => {
+    try {
+      return await fetchAPI<LoginResponse>('/api/session', {
+        method: 'GET',
+      });
+    } catch (error) {
+      // Session is invalid or expired
+      return null;
+    }
+  },
+
+  logout: async (): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/api/logout`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Logout failed: ${response.status}`);
+    }
+    // Don't try to parse JSON - logout endpoint returns empty response
   }
 };

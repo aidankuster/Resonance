@@ -1,4 +1,4 @@
-package com.resonance.server.web.endpoints;
+package com.resonance.server.web.endpoints.session;
 
 import com.password4j.Password;
 import com.resonance.server.Server;
@@ -45,10 +45,11 @@ public class LoginEndpoint implements EndpointGroup {
 			throw new UnauthorizedResponse("Invalid credentials.");
 		}
 		
-		//success
-		ctx.json(ConfigHolder.GSON.toJson(account.toJson(true)));
-		ctx.status(200);
+		//save session
+		Server.INSTANCE.getWebServer().getSessionHandler().storeSession(account, ctx);
 		
-		//TODO: session management with cookies
+		//success
+		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
+		ctx.contentType(ContentType.APPLICATION_JSON);
 	}
 }
