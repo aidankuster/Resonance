@@ -35,10 +35,10 @@ export interface RegisterResponse {
   message: string;
 }
 
-// Profile Types - Updated to match backend UserAccount structure
+// match backend UserAccount structure
 export interface ProfileResponse {
-  id: number;                    // matches backend's id
-  emailAddress: string;          // matches backend's emailAddress
+  id: number;                   
+  emailAddress: string;        
   hashedPassword?: string;       // shouldn't be sent to frontend
   enabled: boolean;
   admin: boolean;

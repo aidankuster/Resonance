@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+/*import { useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
 import type { LoginResponse } from '../services/api';
 
@@ -72,3 +72,4 @@ export function useAuth() {
     checkSession,
   };
 }
+*/

@@ -9,8 +9,6 @@ import com.resonance.server.web.endpoints.session.SessionEndpoint;
 import io.javalin.Javalin;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.staticfiles.Location;
-import org.eclipse.jetty.http.HttpCookie;
-import org.eclipse.jetty.server.session.DefaultSessionCache;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,11 +33,6 @@ public class WebServer {
 	 */
 	private final List<EndpointGroup> endpoints = new ArrayList<>();
 
-	/**
-	 * Session handler
-	 */
-	private final SessionHandler sessionHandler;
-
 	public WebServer(Server server) {
 
 		// load config
@@ -50,8 +43,6 @@ public class WebServer {
 		} catch (Exception ex) {
 			throw new RuntimeException("Failed to load web server config", ex);
 		}
-
-		this.sessionHandler = new SessionHandler(this.config.jwt.hashSecret, this.config.jwt.expirationDuration);
 
 		this.javalin = Javalin.create(config -> {
 			// Enable CORS for development
@@ -67,10 +58,9 @@ public class WebServer {
 			});
 
 			config.staticFiles.add(staticFiles -> {
-				staticFiles.hostedPath = "/"; // change to host files on a subpath, like '/assets'
-				staticFiles.directory = "/public"; // the directory where your files are located
-				staticFiles.location = Location.CLASSPATH; // Location.CLASSPATH (jar) or Location.EXTERNAL (file
-				// system)
+				staticFiles.hostedPath = "/";
+				staticFiles.directory = "/public";
+				staticFiles.location = Location.CLASSPATH;
 			});
 
 			config.spaRoot.addFile("/", "/public/index.html");
@@ -97,5 +87,4 @@ public class WebServer {
 		this.endpoints.add(new ProjectEndpoint());
 		this.endpoints.add(new SearchEndpoint());
 	}
-
 }

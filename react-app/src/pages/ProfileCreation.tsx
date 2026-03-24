@@ -17,14 +17,13 @@ import {
   genresAPI,
   instrumentsAPI,
   profileAPI,
+  authAPI,
 } from "../services/api";
-import { useAuthContext } from "../contexts/AuthContext";
 import type { AccountFormData, ProfileFormData } from "../types/usertypes";
 import type { Genre, Instrument } from "../types/apitypes";
 
 function ProfileCreation() {
   const navigate = useNavigate();
-  const { register: registerUser, checkSession } = useAuthContext();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -288,7 +287,7 @@ function ProfileCreation() {
   const handleRegister = async () => {
     setIsSubmitting(true);
     try {
-      const response = await registerUser(
+      const response = await authAPI.register(
         accountData.email,
         accountData.password,
         accountData.confirmPassword,
@@ -353,12 +352,23 @@ function ProfileCreation() {
 
       console.log("Profile updated successfully:", response);
 
-      // Refresh the session to get updated user data with profile info
-      console.log("Refreshing session to get updated profile data...");
-      await checkSession();
-      console.log("Session refreshed, navigating to dashboard");
+      // Auto-login after profile creation
+      try {
+        const loginResponse = await authAPI.login(
+          accountData.email,
+          accountData.password,
+        );
+        console.log("Auto-login successful");
 
-      // Navigate to dashboard with updated user data
+        // Store token
+        if (loginResponse.token) {
+          localStorage.setItem("authToken", loginResponse.token);
+        }
+      } catch (loginError) {
+        console.warn("Auto-login failed, user can login manually:", loginError);
+      }
+
+      // Navigate to dashboard
       navigate("/dashboard");
     } catch (error: any) {
       console.error("Error updating profile:", error);
@@ -537,6 +547,7 @@ function ProfileCreation() {
           </div>
         );
 
+      // ... rest of renderStep (cases 2, 3, 4 remain the same)
       case 2:
         return (
           <div className="space-y-8">

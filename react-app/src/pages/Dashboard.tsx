@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { profileAPI } from "../services/api";
-import { useAuthContext } from "../contexts/AuthContext";
+import { profileAPI, authAPI } from "../services/api";
 import {
   Music,
   Search,
@@ -36,14 +35,15 @@ interface BackendProfileResponse {
     availability: string;
     experienceLevel: string;
   };
-  instruments: string[]; // Changed from 'tags' to 'instruments'
-  genres: string[]; // New separate array for genres
+  instruments: string[];
+  genres: string[];
 }
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { user, logout, isAuthenticated, isLoading } = useAuthContext();
   const [activeTab, setActiveTab] = useState("discover");
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [userProfile, setUserProfile] = useState({
     name: "",
     instrument: "",
@@ -164,46 +164,68 @@ function Dashboard() {
     },
   ]);
 
-  // Redirect if user logs out
-  useEffect(() => {
-    console.log('Dashboard auth check - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
-    if (!isAuthenticated && !isLoading) {
-      console.log('🔄 Redirecting to home page...');
-      navigate("/", { replace: true });
+  // Handle search submission
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  };
 
-  // Load user profile from auth context (no API call needed)
+  // Load user profile on mount
   useEffect(() => {
-    if (!user) {
-      console.log("No user found in auth context");
-      return;
-    }
+    const loadUserProfile = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        console.log("🔍 Loading profile for userId:", userId);
 
-    console.log("Using user data from auth context:", user);
+        if (!userId) {
+          console.log("❌ No userId found, redirecting to login");
+          navigate("/userinitiation");
+          return;
+        }
 
-    // Calculate profile completion
-    let completion = 0;
-    if (user.info?.displayName) completion += 25;
-    if (user.instruments && user.instruments.length > 0) completion += 25;
-    if (user.genres && user.genres.length > 0) completion += 25;
-    if (user.info?.bio) completion += 25;
+        console.log("📡 Fetching profile for ID:", parseInt(userId));
+        const profileData: BackendProfileResponse =
+          await profileAPI.getCurrentUserProfile(parseInt(userId));
 
-    // Transform user data to match component's expected format
-    setUserProfile({
-      name: user.info?.displayName || 'User',
-      instrument: user.instruments && user.instruments.length > 0 ? user.instruments.join(", ") : "No instruments",
-      completion: completion,
-      profileViews: 0,
-      matches: 0,
-      email: user.emailAddress,
-    });
-  }, [user]);
+        console.log("✅ Profile data received:", profileData);
+
+        // Calculate profile completion
+        let completion = 0;
+        if (profileData.info.displayName) completion += 25;
+        if (profileData.instruments && profileData.instruments.length > 0)
+          completion += 25;
+        if (profileData.genres && profileData.genres.length > 0)
+          completion += 25;
+        if (profileData.info.bio) completion += 25;
+
+        setUserProfile({
+          name: profileData.info.displayName,
+          instrument:
+            profileData.instruments && profileData.instruments.length > 0
+              ? profileData.instruments.join(", ")
+              : "No instruments",
+          completion: completion,
+          profileViews: 0,
+          matches: 0,
+          email: profileData.emailAddress,
+        });
+      } catch (error) {
+        console.error("❌ Failed to load profile:", error);
+        authAPI.logout();
+        navigate("/userinitiation");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserProfile();
+  }, [navigate]);
 
   const handleLogout = async () => {
     try {
-      await logout();
-      // Force navigation with replace to clear history
+      await authAPI.logout();
       navigate("/", { replace: true });
     } catch (error) {
       console.error("Logout failed:", error);
@@ -218,8 +240,8 @@ function Dashboard() {
     console.log("Generate flyer clicked");
   };
 
-  // Loading state - use auth context's isLoading
-  if (isLoading || !user) {
+  // Loading state
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-amber-500"></div>
@@ -240,14 +262,16 @@ function Dashboard() {
           </div>
 
           <div className="flex-1 max-w-2xl mx-8">
-            <div className="relative">
+            <form onSubmit={handleSearch} className="relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
                 type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search musicians, projects, or ensembles..."
                 className="w-full bg-gray-800/50 border border-gray-700 rounded-full pl-12 pr-4 py-3 focus:outline-none focus:border-amber-500"
               />
-            </div>
+            </form>
           </div>
 
           <div className="flex items-center space-x-6">
@@ -441,12 +465,12 @@ function Dashboard() {
                   </div>
                 </div>
 
-                {/* Suggested Musicians Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {suggestedMusicians.map((musician) => (
                     <div
                       key={musician.id}
-                      className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800 hover:border-amber-500/30 transition group"
+                      className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800 hover:border-amber-500/30 transition group cursor-pointer"
+                      onClick={() => navigate(`/profile/${musician.id}`)}
                     >
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center space-x-3">
@@ -499,7 +523,6 @@ function Dashboard() {
                   ))}
                 </div>
 
-                {/* Quick Actions */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
                   <div className="bg-gray-900/30 rounded-2xl p-6 border border-gray-800">
                     <div className="flex items-center gap-3 mb-4">
@@ -557,13 +580,15 @@ function Dashboard() {
               <div className="space-y-8">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">My Projects</h2>
-                  <button className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition">
+                  <button
+                    onClick={() => navigate("/create-project")}
+                    className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition"
+                  >
                     <Plus className="h-5 w-5" />
                     New Project
                   </button>
                 </div>
 
-                {/* Projects Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {userProjects.map((project) => (
                     <div
@@ -635,7 +660,6 @@ function Dashboard() {
                 <h2 className="text-2xl font-bold">Recent Activity</h2>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Activity Feed */}
                   <div className="lg:col-span-2 space-y-6">
                     {recentActivity.map((activity) => (
                       <div
@@ -670,7 +694,6 @@ function Dashboard() {
                     ))}
                   </div>
 
-                  {/* Stats Sidebar */}
                   <div className="space-y-6">
                     <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                       <h3 className="font-bold mb-4">Activity Summary</h3>
@@ -732,7 +755,6 @@ function Dashboard() {
                 <h2 className="text-2xl font-bold">Tools</h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Flyer Generator */}
                   <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="bg-amber-500/20 p-3 rounded-xl">
@@ -742,8 +764,7 @@ function Dashboard() {
                     </div>
                     <p className="text-gray-400 mb-6">
                       Create a printable PDF flyer of your profile to post
-                      around campus. Perfect for bulletin boards and notice
-                      areas.
+                      around campus.
                     </p>
                     <div className="space-y-4">
                       <div>
@@ -765,7 +786,6 @@ function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Share Profile */}
                   <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="bg-amber-500/20 p-3 rounded-xl">
@@ -807,7 +827,6 @@ function Dashboard() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-2 space-y-6">
-                    {/* Profile Settings */}
                     <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                       <h3 className="font-bold text-lg mb-6">
                         Profile Settings
@@ -857,7 +876,6 @@ function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Account Settings */}
                     <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                       <h3 className="font-bold text-lg mb-6">
                         Account Settings
@@ -881,7 +899,6 @@ function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Danger Zone */}
                   <div className="space-y-6">
                     <div className="bg-red-900/10 rounded-2xl p-6 border border-red-800/30">
                       <h3 className="font-bold text-lg mb-4 text-red-400">
@@ -913,7 +930,6 @@ function Dashboard() {
           {/* Right Sidebar - Announcements */}
           <aside className="w-80 flex-shrink-0">
             <div className="sticky top-24 space-y-6">
-              {/* Department Announcements */}
               <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                   <Bell className="h-5 w-5" />
@@ -946,7 +962,6 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* Quick Stats */}
               <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                 <h3 className="font-bold text-lg mb-4">Platform Stats</h3>
                 <div className="space-y-4">
@@ -970,7 +985,6 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* Help & Support */}
               <div className="bg-amber-900/10 rounded-2xl p-6 border border-amber-800/30">
                 <h3 className="font-bold text-lg mb-3">Need Help?</h3>
                 <p className="text-gray-300 text-sm mb-4">

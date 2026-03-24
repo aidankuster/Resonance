@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+/*import { Navigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -28,3 +28,4 @@ export function ProtectedRoute({ children, redirectTo = '/userinitiation' }: Pro
 
   return <>{children}</>;
 }
+*/

@@ -10,7 +10,7 @@ import {
   ChevronLeft,
   SlidersHorizontal,
 } from "lucide-react";
-import { searchAPI, type SearchResultUser } from "../services/api";
+import { searchAPI, profileAPI, type SearchResultUser } from "../services/api";
 
 function SearchResults() {
   const navigate = useNavigate();
@@ -22,6 +22,14 @@ function SearchResults() {
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResultUser[]>([]);
+  const [currentUser, setCurrentUser] = useState<{
+    name: string;
+    instrument: string;
+  }>({
+    name: "",
+    instrument: "",
+  });
+  const [loadingUser, setLoadingUser] = useState(true);
   const [filters, setFilters] = useState({
     instrument: "",
     genre: "",
@@ -73,6 +81,36 @@ function SearchResults() {
     "ADVANCED",
     "PROFESSIONAL",
   ];
+
+  // Load current user profile
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) {
+          setLoadingUser(false);
+          return;
+        }
+
+        const profile = await profileAPI.getCurrentUserProfile(
+          parseInt(userId),
+        );
+        setCurrentUser({
+          name: profile.info.displayName,
+          instrument:
+            profile.instruments && profile.instruments.length > 0
+              ? profile.instruments.join(", ")
+              : "Musician",
+        });
+      } catch (error) {
+        console.error("Failed to load current user:", error);
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+
+    loadCurrentUser();
+  }, []);
 
   // Perform search when component mounts or filters change
   useEffect(() => {
@@ -156,8 +194,10 @@ function SearchResults() {
               className="flex items-center space-x-3"
             >
               <div className="text-right">
-                <p className="font-semibold">Aidan Kuster</p>
-                <p className="text-sm text-gray-400">Guitar & Piano</p>
+                <p className="font-semibold">{currentUser.name || "User"}</p>
+                <p className="text-sm text-gray-400">
+                  {currentUser.instrument || "Musician"}
+                </p>
               </div>
               <div className="h-10 w-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center">
                 <User className="h-6 w-6" />
@@ -167,6 +207,7 @@ function SearchResults() {
         </div>
       </header>
 
+      {/* Rest of the component remains the same */}
       <div className="container mx-auto px-6 py-8">
         {/* Search Header */}
         <div className="flex justify-between items-center mb-6">

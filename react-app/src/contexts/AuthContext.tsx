@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+/*import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import type { LoginResponse } from '../services/api';
@@ -31,4 +31,4 @@ export function useAuthContext() {
     throw new Error('useAuthContext must be used within an AuthProvider');
   }
   return context;
-}
+}*/

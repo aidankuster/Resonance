@@ -1,7 +1,7 @@
-// User Account Types - Updated to match backend
+// User Account Types
 export interface User {
   id: number;
-  emailAddress: string;          // matches backend field name
+  emailAddress: string;        
   displayName: string;
   isVerified: boolean;           // maps to backend 'enabled' field
   isAdmin: boolean;
