@@ -136,8 +136,9 @@ function ProfileCreation() {
   ];
 
   const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@bravemail\.uncp\.edu$/;
-    return emailRegex.test(email);
+    const emailRegex = /^[^\s@]+@uncp\.edu$/;
+    const emailRegex2 = /^[^\s@]+@bravemail\.uncp\.edu$/;
+    return emailRegex.test(email) || emailRegex2.test(email);
   };
 
   const validatePassword = (password: string) => {

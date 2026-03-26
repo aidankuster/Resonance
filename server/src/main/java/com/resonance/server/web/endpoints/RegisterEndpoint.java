@@ -2,9 +2,11 @@ package com.resonance.server.web.endpoints;
 
 import com.password4j.Password;
 import com.resonance.server.Server;
+import com.resonance.server.utils.JwtUtils;
 import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.exception.AlreadyExistsException;
+import com.google.gson.JsonObject;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.*;
 import org.jetbrains.annotations.NotNull;
@@ -14,15 +16,10 @@ import java.util.regex.Pattern;
 
 import static io.javalin.apibuilder.ApiBuilder.*;
 
-/**
- * @author John 2/4/2026
- */
 public class RegisterEndpoint implements EndpointGroup {
 
-	/**
-	 * Form validation regular expressions
-	 */
-	private static final Pattern EMAIL_REGEX = Pattern.compile("^[^\\s@]+@bravemail\\.uncp\\.edu$");
+	private static final Pattern EMAIL_REGEX = Pattern.compile("^[^\\s@]+@uncp\\.edu$");
+	private static final Pattern EMAIL_REGEX2 = Pattern.compile("^[^\\s@]+@bravemail\\.uncp\\.edu$");
 	private static final Pattern PASSWORD_REGEX = Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
 
 	@Override
@@ -37,7 +34,8 @@ public class RegisterEndpoint implements EndpointGroup {
 		final String password = ctx.formParam("password");
 		final String confirmPassword = ctx.formParam("password2");
 
-		if (email == null || email.isBlank() || !EMAIL_REGEX.matcher(email).matches()) {
+		if (email == null || email.isBlank()
+				|| (!EMAIL_REGEX.matcher(email).matches() && !EMAIL_REGEX2.matcher(email).matches())) {
 			throw new BadRequestResponse("Email address is invalid");
 		}
 
@@ -62,9 +60,7 @@ public class RegisterEndpoint implements EndpointGroup {
 				throw new InternalServerErrorResponse("Failed to create account");
 			}
 		} catch (Throwable t) {
-			// Exceptions.unwrap() to get the original exception
 			final Throwable error = Exceptions.unwrap(t);
-
 			Server.LOGGER.error("Failed to create account", error);
 
 			if (error instanceof AlreadyExistsException) {
@@ -74,8 +70,23 @@ public class RegisterEndpoint implements EndpointGroup {
 			throw new InternalServerErrorResponse("Failed to create account");
 		}
 
-		// Return the account info without session
-		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
+		// Generate JWT token for auto-login
+		String token = JwtUtils.generateToken(account.id(), account.emailAddress());
+
+		// Create response with token and user data
+		JsonObject response = new JsonObject();
+		response.addProperty("token", token);
+		response.addProperty("id", account.id());
+		response.addProperty("emailAddress", account.emailAddress());
+		response.addProperty("enabled", account.enabled());
+		response.addProperty("admin", account.admin());
+		response.add("info", account.info().toJson());
+
+		// Add instruments and genres (empty for new user)
+		response.add("instruments", new com.google.gson.JsonArray());
+		response.add("genres", new com.google.gson.JsonArray());
+
+		ctx.result(ConfigHolder.GSON.toJson(response));
 		ctx.contentType(ContentType.APPLICATION_JSON);
 		ctx.status(201);
 	}

@@ -27,6 +27,7 @@ export interface LoginResponse {
 }
 
 export interface RegisterResponse {
+  token?: string; 
   id: number;
   emailAddress: string;
   enabled: boolean;
@@ -222,27 +223,32 @@ export const authAPI = {
 },
 
   register: async (email: string, password: string, confirmPassword: string): Promise<RegisterResponse> => {
-    console.log(`📝 Registering new user with email: ${email}`);
-    const formData = new FormData();
-    formData.append('email', email);
-    formData.append('password', password);
-    formData.append('password2', confirmPassword);
+  console.log(`📝 Registering new user with email: ${email}`);
+  const formData = new FormData();
+  formData.append('email', email);
+  formData.append('password', password);
+  formData.append('password2', confirmPassword);
 
-    try {
-      const data = await fetchFormData<RegisterResponse>('/api/register', formData, 'POST');
-      console.log(`✅ Registration successful for user ID: ${data.id}`);
-      
-      if (data.id) {
-        localStorage.setItem('userId', data.id.toString());
-        console.log(`👤 User ID ${data.id} stored`);
-      }
-      
-      return data;
-    } catch (error: any) {
-      console.error('❌ Registration failed:', error.message);
-      throw error;
+  try {
+    const data = await fetchFormData<RegisterResponse>('/api/register', formData, 'POST');
+    console.log(`✅ Registration successful for user ID: ${data.id}`);
+    
+    // Store token if present (now it will be!)
+    if (data.token) {
+      localStorage.setItem('authToken', data.token);
+      console.log('🔑 Auth token stored');
     }
-  },
+    if (data.id) {
+      localStorage.setItem('userId', data.id.toString());
+      console.log(`👤 User ID ${data.id} stored`);
+    }
+    
+    return data;
+  } catch (error: any) {
+    console.error('❌ Registration failed:', error.message);
+    throw error;
+  }
+},
 
   // Check if user has an active session via JWT
   checkSession: async (): Promise<LoginResponse | null> => {

@@ -116,11 +116,56 @@ public class DatabaseManager implements AutoCloseable {
 	}
 
 	public Mono<Void> updateAccount(UserAccount account) {
+		System.out.println("🔄 Updating account ID: " + account.id());
+		System.out.println("   displayName: " + account.info().displayName());
+		System.out.println("   bio: " + account.info().bio());
+		System.out.println("   experienceLevel: " + account.info().experienceLevel());
+		System.out.println("   tags count: " + account.tags().length);
+
 		return Mono.from(
 				this.dsl.transactionPublisher(conf -> {
 					final DSLContext tx = using(conf);
-					// ... update logic
-					return Flux.empty();
+
+					// Update user_account table
+					var updateUserAccount = tx.update(table("user_account"))
+							.set(field("email_address"), inline(account.emailAddress(), String.class))
+							.set(field("password"), inline(account.hashedPassword(), String.class))
+							.set(field("enabled"), inline(account.enabled(), Boolean.class))
+							.set(field("admin"), inline(account.admin(), Boolean.class))
+							.where(field("account_id").eq(inline(account.id(), Integer.class)));
+
+					// Update user_account_info table
+					var updateUserInfo = tx.update(table("user_account_info"))
+							.set(field("display_name"), inline(account.info().displayName(), String.class))
+							.set(field("bio"), inline(account.info().bio(), String.class))
+							.set(field("availability"), inline(account.info().availability(), String.class))
+							.set(field("experience_level"),
+									inline(account.info().experienceLevel(),
+											UserAccount.UserInfo.ExperienceLevel.class))
+							.where(field("account_id").eq(inline(account.id(), Integer.class)));
+
+					// Delete existing tags
+					var deleteTags = tx.deleteFrom(table("user_account_tags"))
+							.where(field("account_id").eq(inline(account.id(), Integer.class)));
+
+					// Insert new tags
+					List<Row2<Integer, Integer>> tagRows = Arrays.stream(account.tags())
+							.filter(Objects::nonNull)
+							.map(t -> row(
+									inline(account.id(), Integer.class),
+									inline(t.getTagID(), Integer.class)))
+							.toList();
+
+					var insertTags = tx.insertInto(table("user_account_tags"))
+							.columns(field("account_id", Integer.class), field("tag_id", Integer.class))
+							.valuesOfRows(tagRows);
+
+					// Execute all updates in sequence
+					return Flux.concat(
+							Mono.from(updateUserAccount).then(),
+							Mono.from(updateUserInfo).then(),
+							Mono.from(deleteTags).then(),
+							tagRows.isEmpty() ? Mono.empty() : Mono.from(insertTags).then());
 				})).then();
 	}
 
