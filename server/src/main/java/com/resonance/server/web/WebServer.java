@@ -27,6 +27,11 @@ public class WebServer {
 	 * Javalin instance
 	 */
 	private final Javalin javalin;
+	
+	/**
+	 * Session handler
+	 */
+	private final SessionHandler sessionHandler;
 
 	/**
 	 * List of endpoints
@@ -43,7 +48,9 @@ public class WebServer {
 		} catch (Exception ex) {
 			throw new RuntimeException("Failed to load web server config", ex);
 		}
-
+		
+		this.sessionHandler = new SessionHandler(this.config.jwt.hashSecret, this.config.jwt.expirationDuration);
+		
 		this.javalin = Javalin.create(config -> {
 			// Enable CORS for development
 			config.bundledPlugins.enableCors(cors -> {
@@ -86,5 +93,9 @@ public class WebServer {
 		this.endpoints.add(new ProfileEndpoint());
 		this.endpoints.add(new ProjectEndpoint());
 		this.endpoints.add(new SearchEndpoint());
+	}
+	
+	public SessionHandler getSessionHandler() {
+		return this.sessionHandler;
 	}
 }

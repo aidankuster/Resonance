@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
   LogIn,
@@ -14,6 +15,7 @@ import { authAPI } from "../services/api";
 
 function UserInitiation() {
   const navigate = useNavigate();
+  const { login } = useAuthContext();
   const [showLogin, setShowLogin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,7 +72,7 @@ function UserInitiation() {
 
     setIsSubmitting(true);
     try {
-      const response = await authAPI.login(loginData.email, loginData.password);
+      const response = await login(loginData.email, loginData.password);
       console.log("Login successful:", response);
       navigate("/dashboard");
     } catch (error: any) {

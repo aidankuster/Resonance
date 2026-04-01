@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
   ChevronLeft,
@@ -56,20 +57,14 @@ interface ProjectData {
 function ProjectProfile() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuthContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [project, setProject] = useState<ProjectData | null>(null);
   const [activeTab, setActiveTab] = useState<
     "overview" | "members" | "applications"
   >("overview");
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-
-  useEffect(() => {
-    const userId = localStorage.getItem("userId");
-    if (userId) {
-      setCurrentUserId(parseInt(userId));
-    }
-  }, []);
+  const currentUserId = user?.id || null;
 
   useEffect(() => {
     const loadProject = async () => {

@@ -1,9 +1,9 @@
-/*import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
-import type { LoginResponse } from '../services/api';
+import type { ProfileResponse } from '../services/api';
 
 export function useAuth() {
-  const [user, setUser] = useState<LoginResponse | null>(null);
+  const [user, setUser] = useState<ProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -72,4 +72,3 @@ export function useAuth() {
     checkSession,
   };
 }
-*/

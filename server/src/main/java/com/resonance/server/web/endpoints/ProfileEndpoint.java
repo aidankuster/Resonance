@@ -1,7 +1,6 @@
 package com.resonance.server.web.endpoints;
 
 import com.resonance.server.Server;
-import com.resonance.server.utils.JwtUtils;
 import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.data.tags.Tag;
@@ -45,20 +44,8 @@ public class ProfileEndpoint implements EndpointGroup {
 		}
 
 		// POST request - handle profile updates
-		// Validate JWT token to make sure the user can only edit their own profile
-		String authHeader = ctx.header("Authorization");
-		if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-			throw new UnauthorizedResponse("Missing or invalid authentication token");
-		}
-
-		String token = authHeader.substring(7);
-		int userIdFromToken = JwtUtils.getUserIdFromToken(token);
-
-		if (userIdFromToken == -1) {
-			throw new UnauthorizedResponse("Invalid or expired token");
-		}
-
-		if (userIdFromToken != account.id()) {
+		// validate the session to make sure the user can only edit their own profile
+		if(Server.INSTANCE.getWebServer().getSessionHandler().validateSession(ctx).id() != account.id()) {
 			throw new UnauthorizedResponse("You cannot modify another user's profile");
 		}
 

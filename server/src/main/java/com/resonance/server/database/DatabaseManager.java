@@ -191,11 +191,13 @@ public class DatabaseManager implements AutoCloseable {
 				.switchIfEmpty(
 						Mono.fromRunnable(() -> System.out.println("❌ No account found for email: " + emailAddress)));
 	}
-
-	public Flux<UserAccount> findAccount(Condition condition) {
-		System.out.println("🔍 DatabaseManager.findAccount(Condition) called");
-		System.out.println("🔍 Condition: " + condition);
-
+	
+	public Flux<UserAccount> getAccounts() {
+		final Condition condition = field("account_id").isNotNull();
+		return this.getAccounts(condition);
+	}
+	
+	public Flux<UserAccount> getAccounts(Condition condition) {
 		return Flux.from(
 				this.dsl.selectFrom(
 						table("user_account")

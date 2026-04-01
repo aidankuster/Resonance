@@ -1,14 +1,14 @@
-/*import { createContext, useContext } from 'react';
+import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import type { LoginResponse } from '../services/api';
+import type { ProfileResponse } from '../services/api';
 
 interface AuthContextType {
-  user: LoginResponse | null;
+  user: ProfileResponse | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<LoginResponse>;
-  register: (email: string, password: string, confirmPassword: string) => Promise<LoginResponse>;
+  login: (email: string, password: string) => Promise<ProfileResponse>;
+  register: (email: string, password: string, confirmPassword: string) => Promise<ProfileResponse>;
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
 }
@@ -31,4 +31,4 @@ export function useAuthContext() {
     throw new Error('useAuthContext must be used within an AuthProvider');
   }
   return context;
-}*/
+}

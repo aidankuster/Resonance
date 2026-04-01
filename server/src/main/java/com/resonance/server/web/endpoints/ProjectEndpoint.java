@@ -111,7 +111,7 @@ public class ProjectEndpoint implements EndpointGroup {
             Project project = null;
             try {
                 project = Server.INSTANCE.getDatabaseManager()
-                        .createProject(projectName, description, status, founder.id()).block();
+                                         .createProject(projectName, description, status, founder.id()).block();
             } catch (Exception e) {
                 System.err.println("ERROR: Exception in createProject: " + e.getMessage());
                 e.printStackTrace();

@@ -1,48 +1,6 @@
 const API_BASE_URL = 'http://localhost:80';
 
 // Define response types based on backend responses
-export interface ProfileCreateResponse {
-  userId: number;
-  message?: string;
-}
-
-export interface LoginResponse {
-  token: string;
-  userId: number;        
-  email: string;       
-  user?: {             
-    id: number;
-    emailAddress: string;
-    enabled: boolean;
-    admin: boolean;
-    info: {
-      displayName: string;
-      bio: string;
-      availability: string;
-      experienceLevel: string;
-    };
-    instruments: string[];
-    genres: string[];
-  };
-}
-
-export interface RegisterResponse {
-  token?: string; 
-  id: number;
-  emailAddress: string;
-  enabled: boolean;
-  admin: boolean;
-  info?: {
-    displayName: string;
-    bio: string;
-    availability: string;
-    experienceLevel: string;
-  };
-  instruments?: string[];
-  genres?: string[];
-  message?: string;
-}
-
 export interface ProfileResponse {
   id: number;
   emailAddress: string;
@@ -169,14 +127,8 @@ export const searchAPI = {
   }
 };
 
-// Helper to get auth headers (only returns headers if token exists)
+// No longer needed as we ae using cookie-based auth -John
 const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('authToken');
-  if (token) {
-    console.log('🔑 Using auth token:', token.substring(0, 20) + '...');
-    return { 'Authorization': `Bearer ${token}` };
-  }
-  console.log('🔓 No auth token found');
   return {};
 };
 
@@ -184,6 +136,7 @@ const getAuthHeaders = (): HeadersInit => {
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   console.log(`📡 Fetching ${endpoint}...`);
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    credentials: 'include', // Include cookies for session-based auth
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
@@ -209,10 +162,11 @@ async function fetchFormData<T>(endpoint: string, formData: FormData, method: st
   for (let pair of formData.entries()) {
     console.log(`   FormData: ${pair[0]} = ${pair[1] instanceof File ? `File: ${pair[1].name}` : pair[1]}`);
   }
-  
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method,
     body: formData,
+    credentials: 'include', // Include cookies for session-based auth
     headers: getAuthHeaders(),
   });
 
@@ -243,6 +197,7 @@ export const profileAPI = {
   getCurrentUserProfile: async (userId: number): Promise<ProfileResponse> => {
     console.log(`📡 Fetching profile for user ID: ${userId}`);
     const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
+      credentials: 'include', // Include cookies for session-based auth
       headers: getAuthHeaders(),
     });
     if (!response.ok) {
@@ -264,26 +219,15 @@ export const profileAPI = {
 
 // Authentication
 export const authAPI = {
-  login: async (email: string, password: string): Promise<LoginResponse> => {
+  login: async (email: string, password: string): Promise<ProfileResponse> => {
     console.log(`🔐 Attempting login for email: ${email}`);
     const formData = new FormData();
     formData.append('email', email);
     formData.append('password', password);
 
     try {
-      const data = await fetchFormData<LoginResponse>('/api/login', formData, 'POST');
-      console.log(`✅ Login successful for user ID: ${data.userId}`);  
-      
-      // Store token if present
-      if (data.token) {
-        localStorage.setItem('authToken', data.token);
-        console.log('🔑 Auth token stored');
-      }
-      if (data.userId) { 
-        localStorage.setItem('userId', data.userId.toString());
-        console.log(`👤 User ID ${data.userId} stored`);
-      }
-      
+      const data = await fetchFormData<ProfileResponse>('/api/login', formData, 'POST');
+      console.log(`✅ Login successful for user ID: ${data.id}`);
       return data;
     } catch (error: any) {
       console.error('❌ Login failed:', error.message);
@@ -291,7 +235,7 @@ export const authAPI = {
     }
   },
 
-  register: async (email: string, password: string, confirmPassword: string): Promise<RegisterResponse> => {
+  register: async (email: string, password: string, confirmPassword: string): Promise<ProfileResponse> => {
     console.log(`📝 Registering new user with email: ${email}`);
     const formData = new FormData();
     formData.append('email', email);
@@ -299,19 +243,8 @@ export const authAPI = {
     formData.append('password2', confirmPassword);
 
     try {
-      const data = await fetchFormData<RegisterResponse>('/api/register', formData, 'POST');
+      const data = await fetchFormData<ProfileResponse>('/api/register', formData, 'POST');
       console.log(`✅ Registration successful for user ID: ${data.id}`);
-      
-      // Store token if present
-      if (data.token) {
-        localStorage.setItem('authToken', data.token);
-        console.log('🔑 Auth token stored');
-      }
-      if (data.id) {
-        localStorage.setItem('userId', data.id.toString());
-        console.log(`👤 User ID ${data.id} stored`);
-      }
-      
       return data;
     } catch (error: any) {
       console.error('❌ Registration failed:', error.message);
@@ -319,44 +252,33 @@ export const authAPI = {
     }
   },
 
-  // Check if user has an active session via JWT
-  checkSession: async (): Promise<LoginResponse | null> => {
-    const token = localStorage.getItem('authToken');
-    console.log('🔍 Checking session, token present:', !!token);
-    
-    if (!token) {
-      return null;
-    }
-    
+  // Check if user has an active session via cookie
+  checkSession: async (): Promise<ProfileResponse | null> => {
+    console.log('🔍 Checking session...');
+
     try {
-      // Use the session endpoint to verify token
-      const data = await fetchAPI<LoginResponse>('/api/session', {
+      // Use the session endpoint to verify cookie-based session
+      const data = await fetchAPI<ProfileResponse>('/api/session', {
         method: 'GET',
       });
-      console.log('✅ Session valid for user:', data.userId);
+      console.log('✅ Session valid for user:', data.id);
       return data;
     } catch (error) {
       console.error('❌ Session invalid or expired');
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('userId');
       return null;
     }
   },
 
   logout: async (): Promise<void> => {
     console.log('🚪 Logging out...');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userId');
-    console.log('✅ Local storage cleared');
-    // Optional: Call logout endpoint if needed
     try {
       await fetch(`${API_BASE_URL}/api/logout`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        credentials: 'include', // Include cookies
       });
       console.log('✅ Logout endpoint called');
     } catch (error) {
-      console.log('⚠️ Logout endpoint not available, already logged out locally');
+      console.log('⚠️ Logout endpoint not available, clearing session locally');
     }
   }
 };

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
   ChevronLeft,
@@ -21,6 +22,7 @@ interface ProjectRole {
 
 function ProjectCreation() {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuthContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const availableInstruments = [
     "Piano",
@@ -63,17 +65,13 @@ function ProjectCreation() {
   const [founderName, setFounderName] = useState("");
 
   useEffect(() => {
-    // Get user info from localStorage or context
-    const userId = localStorage.getItem("userId");
-    if (!userId) {
+    if (!isAuthenticated || !user) {
       navigate("/userinitiation");
       return;
     }
 
-    //  could fetch user profile to get display name
-    // For now, use a placeholder or get from somewhere
-    setFounderName(localStorage.getItem("userName") || "You");
-  }, [navigate]);
+    setFounderName(user.info?.displayName || "You");
+  }, [navigate, isAuthenticated, user]);
 
   // Get status-specific helper text and colors
   const getStatusInfo = () => {
@@ -190,8 +188,7 @@ function ProjectCreation() {
     }
 
     // Check if user is logged in
-    const userId = localStorage.getItem("userId");
-    if (!userId) {
+    if (!isAuthenticated || !user) {
       alert("You must be logged in to create a project");
       navigate("/userinitiation");
       return;
@@ -204,7 +201,7 @@ function ProjectCreation() {
       formData.append("projectName", projectData.projectName);
       formData.append("description", projectData.description);
       formData.append("status", projectData.status);
-      formData.append("founderId", userId);
+      formData.append("founderId", user.id.toString());
 
       // Only add roles if not in planning phase
       if (projectData.status !== "planning" && roles.length > 0) {

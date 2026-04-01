@@ -58,7 +58,7 @@ public class SearchEndpoint implements EndpointGroup {
     private List<Map<String, Object>> searchUsers(String query, String instrument,
             String genre, String experienceLevel) {
         List<UserAccount> allUsers = Server.INSTANCE.getDatabaseManager()
-                .getAllUsers().collectList().block();
+													.getAccounts().collectList().block();
 
         if (allUsers == null || allUsers.isEmpty()) {
             return new ArrayList<>();

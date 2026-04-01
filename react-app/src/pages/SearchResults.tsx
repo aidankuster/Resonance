@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
   Search,
@@ -22,6 +23,7 @@ import {
 function SearchResults() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuthContext();
   const queryParams = new URLSearchParams(location.search);
   const initialQuery = queryParams.get("q") || "";
 
@@ -99,15 +101,12 @@ function SearchResults() {
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
-        const userId = localStorage.getItem("userId");
-        if (!userId) {
+        if (!user) {
           setLoadingUser(false);
           return;
         }
 
-        const profile = await profileAPI.getCurrentUserProfile(
-          parseInt(userId),
-        );
+        const profile = await profileAPI.getCurrentUserProfile(user.id);
         setCurrentUser({
           name: profile.info.displayName,
           instrument:
@@ -123,7 +122,7 @@ function SearchResults() {
     };
 
     loadCurrentUser();
-  }, []);
+  }, [user]);
 
   // Perform search when component mounts, filters change, or search type changes
   useEffect(() => {

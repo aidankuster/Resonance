@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { profileAPI, authAPI } from "../services/api";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
   Search,
@@ -41,6 +42,7 @@ interface BackendProfileResponse {
 
 function Dashboard() {
   const navigate = useNavigate();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext();
   const [activeTab, setActiveTab] = useState("discover");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -176,18 +178,15 @@ function Dashboard() {
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
-        const userId = localStorage.getItem("userId");
-        console.log("🔍 Loading profile for userId:", userId);
-
-        if (!userId) {
-          console.log("❌ No userId found, redirecting to login");
+        if (!isAuthenticated || !user) {
+          console.log("❌ No authenticated user found, redirecting to login");
           navigate("/userinitiation");
           return;
         }
 
-        console.log("📡 Fetching profile for ID:", parseInt(userId));
+        console.log("📡 Fetching profile for ID:", user.id);
         const profileData: BackendProfileResponse =
-          await profileAPI.getCurrentUserProfile(parseInt(userId));
+          await profileAPI.getCurrentUserProfile(user.id);
 
         console.log("✅ Profile data received:", profileData);
 
@@ -220,8 +219,10 @@ function Dashboard() {
       }
     };
 
-    loadUserProfile();
-  }, [navigate]);
+    if (!authLoading) {
+      loadUserProfile();
+    }
+  }, [navigate, isAuthenticated, user, authLoading]);
 
   const handleLogout = async () => {
     try {

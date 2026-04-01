@@ -2,7 +2,6 @@ package com.resonance.server.data;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.resonance.server.utils.JwtUtils;
 import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.tags.Genre;
 import com.resonance.server.data.tags.Instrument;
@@ -59,13 +58,6 @@ public record UserAccount(
 		obj.add("genres", genresArray);
 
 		return obj;
-	}
-
-	/**
-	 * Create a JWT token for this user
-	 */
-	public String createJWT() {
-		return JwtUtils.generateToken(this.id, this.emailAddress);
 	}
 
 	public static class Mutable {

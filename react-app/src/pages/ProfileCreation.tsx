@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
   Upload,
@@ -24,6 +25,7 @@ import type { Genre, Instrument } from "../types/apitypes";
 
 function ProfileCreation() {
   const navigate = useNavigate();
+  const { login } = useAuthContext();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -355,16 +357,12 @@ function ProfileCreation() {
 
       // Auto-login after profile creation
       try {
-        const loginResponse = await authAPI.login(
+        const loginResponse = await login(
           accountData.email,
           accountData.password,
         );
         console.log("Auto-login successful");
-
-        // Store token
-        if (loginResponse.token) {
-          localStorage.setItem("authToken", loginResponse.token);
-        }
+        // Session is now stored in cookie by backend, no need to store token
       } catch (loginError) {
         console.warn("Auto-login failed, user can login manually:", loginError);
       }

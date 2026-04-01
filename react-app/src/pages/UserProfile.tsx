@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
   ChevronLeft,
@@ -36,6 +37,7 @@ interface UserProfileData {
 function UserProfile() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { user, isAuthenticated } = useAuthContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfileData | null>(null);
@@ -52,8 +54,7 @@ function UserProfile() {
         setError(null);
 
         // Get current user ID
-        const currentUserId = localStorage.getItem("userId");
-        if (!currentUserId) {
+        if (!isAuthenticated || !user) {
           navigate("/userinitiation");
           return;
         }
@@ -65,7 +66,7 @@ function UserProfile() {
 
         // Load both profiles in parallel
         const [currentUserData, profileData] = await Promise.all([
-          profileAPI.getCurrentUserProfile(parseInt(currentUserId)),
+          profileAPI.getCurrentUserProfile(user.id),
           profileAPI.getCurrentUserProfile(parseInt(id)),
         ]);
 
@@ -80,7 +81,7 @@ function UserProfile() {
     };
 
     loadProfiles();
-  }, [id, navigate]);
+  }, [id, navigate, isAuthenticated, user]);
 
   const getExperienceLevelColor = (level: string) => {
     switch (level?.toUpperCase()) {

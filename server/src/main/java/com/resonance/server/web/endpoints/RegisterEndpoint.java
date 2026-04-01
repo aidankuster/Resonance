@@ -2,11 +2,9 @@ package com.resonance.server.web.endpoints;
 
 import com.password4j.Password;
 import com.resonance.server.Server;
-import com.resonance.server.utils.JwtUtils;
 import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.exception.AlreadyExistsException;
-import com.google.gson.JsonObject;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.*;
 import org.jetbrains.annotations.NotNull;
@@ -69,24 +67,11 @@ public class RegisterEndpoint implements EndpointGroup {
 
 			throw new InternalServerErrorResponse("Failed to create account");
 		}
-
-		// Generate JWT token for auto-login
-		String token = JwtUtils.generateToken(account.id(), account.emailAddress());
-
-		// Create response with token and user data
-		JsonObject response = new JsonObject();
-		response.addProperty("token", token);
-		response.addProperty("id", account.id());
-		response.addProperty("emailAddress", account.emailAddress());
-		response.addProperty("enabled", account.enabled());
-		response.addProperty("admin", account.admin());
-		response.add("info", account.info().toJson());
-
-		// Add instruments and genres (empty for new user)
-		response.add("instruments", new com.google.gson.JsonArray());
-		response.add("genres", new com.google.gson.JsonArray());
-
-		ctx.result(ConfigHolder.GSON.toJson(response));
+		
+		//store session
+		Server.INSTANCE.getWebServer().getSessionHandler().storeSession(account, ctx);
+		
+		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
 		ctx.contentType(ContentType.APPLICATION_JSON);
 		ctx.status(201);
 	}
