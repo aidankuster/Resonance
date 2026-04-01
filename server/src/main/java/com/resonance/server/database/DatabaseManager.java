@@ -305,10 +305,13 @@ public class DatabaseManager implements AutoCloseable {
 						field("p.founder_id").as("founder_id"),
 						field("p.member_count").as("member_count"),
 						field("p.created_at").as("created_at"),
-						field("u.display_name").as("founder_name"))
+						field("u.display_name").as("founder_name"),
+						field("ua.email_address").as("founder_email")) // Add founder email
 						.from(table("projects").as("p"))
 						.leftJoin(table("user_account_info").as("u"))
 						.on(field("p.founder_id").eq(field("u.account_id")))
+						.leftJoin(table("user_account").as("ua")) // Join with user_account for email
+						.on(field("p.founder_id").eq(field("ua.account_id")))
 						.where(field("p.project_id").eq(projectId)))
 				.map(record -> {
 					Project project = new Project();
@@ -318,6 +321,7 @@ public class DatabaseManager implements AutoCloseable {
 					project.status = record.get("status", String.class);
 					project.founderId = record.get("founder_id", Integer.class);
 					project.founderName = record.get("founder_name", String.class);
+					project.founderEmail = record.get("founder_email", String.class);
 					project.memberCount = record.get("member_count", Integer.class);
 					project.createdAt = record.get("created_at", String.class);
 
@@ -360,10 +364,13 @@ public class DatabaseManager implements AutoCloseable {
 						field("p.founder_id").as("founder_id"),
 						field("p.member_count").as("member_count"),
 						field("p.created_at").as("created_at"),
-						field("u.display_name").as("founder_name"))
+						field("u.display_name").as("founder_name"),
+						field("ua.email_address").as("founder_email")) // Add founder email
 						.from(table("projects").as("p"))
 						.leftJoin(table("user_account_info").as("u"))
 						.on(field("p.founder_id").eq(field("u.account_id")))
+						.leftJoin(table("user_account").as("ua")) // Join with user_account for email
+						.on(field("p.founder_id").eq(field("ua.account_id")))
 						.orderBy(field("p.created_at").desc()))
 				.map(record -> {
 					Project project = new Project();
@@ -373,9 +380,14 @@ public class DatabaseManager implements AutoCloseable {
 					project.status = record.get("status", String.class);
 					project.founderId = record.get("founder_id", Integer.class);
 					project.founderName = record.get("founder_name", String.class);
+					project.founderEmail = record.get("founder_email", String.class); // Add this line
 					project.memberCount = record.get("member_count", Integer.class);
 					project.createdAt = record.get("created_at", String.class);
-					project.roles = getProjectRoles(project.id).collectList().block();
+
+					// Load roles for each project
+					List<ProjectRole> rolesList = getProjectRoles(project.id).collectList().block();
+					project.roles = rolesList != null ? rolesList : new ArrayList<>();
+
 					return project;
 				});
 	}

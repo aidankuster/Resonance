@@ -9,6 +9,7 @@ public class Project {
 	public String status;
 	public int founderId;
 	public String founderName;
+	public String founderEmail;
 	public int memberCount;
 	public List<ProjectRole> roles;
 	public String createdAt;

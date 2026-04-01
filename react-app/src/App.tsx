@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import SearchResults from "./pages/SearchResults";
 import ProjectCreation from "./pages/ProjectCreation";
 import UserProfile from "./pages/UserProfile";
+import ProjectProfile from "./pages/ProjectProfile";
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/search" element={<SearchResults />} />
         <Route path="/create-project" element={<ProjectCreation />} />
         <Route path="/profile/:id" element={<UserProfile />} />
+        <Route path="/project/:id" element={<ProjectProfile />} />
       </Routes>
     </Router>
   );

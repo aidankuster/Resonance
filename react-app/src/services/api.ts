@@ -58,8 +58,10 @@ export interface ProfileResponse {
   genres: string[];       
 }
 
+// Search Types
 export interface SearchFilters {
   query?: string;
+  type?: 'users' | 'projects' | 'all';
   instrument?: string;
   genre?: string;
   experienceLevel?: string;
@@ -67,6 +69,7 @@ export interface SearchFilters {
 
 export interface SearchResultUser {
   id: number;
+  type: 'user';
   displayName: string;
   instruments: string[];
   genres: string[];
@@ -76,16 +79,37 @@ export interface SearchResultUser {
   matchPercentage?: number;
 }
 
+export interface SearchResultProject {
+  id: number;
+  type: 'project';
+  title: string;
+  description: string;
+  status: string;
+  founderName: string;
+  memberCount: number;
+  neededInstruments: string[];
+  genres: string[];
+  matchPercentage?: number;
+  createdAt: string;
+}
+
+export interface UnifiedSearchResult {
+  users: SearchResultUser[];
+  projects: SearchResultProject[];
+}
+
+// Enhanced Search API
 export const searchAPI = {
-  searchUsers: async (filters: SearchFilters): Promise<SearchResultUser[]> => {
-    // Build query string from filters
+  // Search both users and projects
+  searchAll: async (filters: SearchFilters): Promise<UnifiedSearchResult> => {
     const params = new URLSearchParams();
     if (filters.query) params.append('q', filters.query);
+    if (filters.type) params.append('type', filters.type);
     if (filters.instrument) params.append('instrument', filters.instrument);
     if (filters.genre) params.append('genre', filters.genre);
     if (filters.experienceLevel) params.append('experienceLevel', filters.experienceLevel);
     
-    console.log('🔍 Searching with params:', params.toString());
+    console.log('🔍 Searching all with params:', params.toString());
     const response = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`);
     
     if (!response.ok) {
@@ -95,8 +119,53 @@ export const searchAPI = {
     }
     
     const data = await response.json();
-    console.log('✅ Search results:', data.length);
+    console.log(`✅ Search results: ${data.users?.length || 0} users, ${data.projects?.length || 0} projects`);
     return data;
+  },
+  
+  // Search only users
+  searchUsers: async (filters: SearchFilters): Promise<SearchResultUser[]> => {
+    const params = new URLSearchParams();
+    if (filters.query) params.append('q', filters.query);
+    if (filters.instrument) params.append('instrument', filters.instrument);
+    if (filters.genre) params.append('genre', filters.genre);
+    if (filters.experienceLevel) params.append('experienceLevel', filters.experienceLevel);
+    params.append('type', 'users');
+    
+    console.log('🔍 Searching users with params:', params.toString());
+    const response = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ User search failed:', response.status, errorText);
+      throw new Error(`User search failed (${response.status}): ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log(`✅ User search results: ${data.users?.length || 0} users`);
+    return data.users || [];
+  },
+  
+  // Search only projects
+  searchProjects: async (filters: SearchFilters): Promise<SearchResultProject[]> => {
+    const params = new URLSearchParams();
+    if (filters.query) params.append('q', filters.query);
+    if (filters.instrument) params.append('instrument', filters.instrument);
+    if (filters.genre) params.append('genre', filters.genre);
+    params.append('type', 'projects');
+    
+    console.log('🔍 Searching projects with params:', params.toString());
+    const response = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Project search failed:', response.status, errorText);
+      throw new Error(`Project search failed (${response.status}): ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log(`✅ Project search results: ${data.projects?.length || 0} projects`);
+    return data.projects || [];
   }
 };
 
@@ -196,59 +265,59 @@ export const profileAPI = {
 // Authentication
 export const authAPI = {
   login: async (email: string, password: string): Promise<LoginResponse> => {
-  console.log(`🔐 Attempting login for email: ${email}`);
-  const formData = new FormData();
-  formData.append('email', email);
-  formData.append('password', password);
+    console.log(`🔐 Attempting login for email: ${email}`);
+    const formData = new FormData();
+    formData.append('email', email);
+    formData.append('password', password);
 
-  try {
-    const data = await fetchFormData<LoginResponse>('/api/login', formData, 'POST');
-    console.log(`✅ Login successful for user ID: ${data.userId}`);  
-    
-    // Store token if present
-    if (data.token) {
-      localStorage.setItem('authToken', data.token);
-      console.log('🔑 Auth token stored');
+    try {
+      const data = await fetchFormData<LoginResponse>('/api/login', formData, 'POST');
+      console.log(`✅ Login successful for user ID: ${data.userId}`);  
+      
+      // Store token if present
+      if (data.token) {
+        localStorage.setItem('authToken', data.token);
+        console.log('🔑 Auth token stored');
+      }
+      if (data.userId) { 
+        localStorage.setItem('userId', data.userId.toString());
+        console.log(`👤 User ID ${data.userId} stored`);
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error('❌ Login failed:', error.message);
+      throw error;
     }
-    if (data.userId) { 
-      localStorage.setItem('userId', data.userId.toString());
-      console.log(`👤 User ID ${data.userId} stored`);
-    }
-    
-    return data;
-  } catch (error: any) {
-    console.error('❌ Login failed:', error.message);
-    throw error;
-  }
-},
+  },
 
   register: async (email: string, password: string, confirmPassword: string): Promise<RegisterResponse> => {
-  console.log(`📝 Registering new user with email: ${email}`);
-  const formData = new FormData();
-  formData.append('email', email);
-  formData.append('password', password);
-  formData.append('password2', confirmPassword);
+    console.log(`📝 Registering new user with email: ${email}`);
+    const formData = new FormData();
+    formData.append('email', email);
+    formData.append('password', password);
+    formData.append('password2', confirmPassword);
 
-  try {
-    const data = await fetchFormData<RegisterResponse>('/api/register', formData, 'POST');
-    console.log(`✅ Registration successful for user ID: ${data.id}`);
-    
-    // Store token if present (now it will be!)
-    if (data.token) {
-      localStorage.setItem('authToken', data.token);
-      console.log('🔑 Auth token stored');
+    try {
+      const data = await fetchFormData<RegisterResponse>('/api/register', formData, 'POST');
+      console.log(`✅ Registration successful for user ID: ${data.id}`);
+      
+      // Store token if present
+      if (data.token) {
+        localStorage.setItem('authToken', data.token);
+        console.log('🔑 Auth token stored');
+      }
+      if (data.id) {
+        localStorage.setItem('userId', data.id.toString());
+        console.log(`👤 User ID ${data.id} stored`);
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error('❌ Registration failed:', error.message);
+      throw error;
     }
-    if (data.id) {
-      localStorage.setItem('userId', data.id.toString());
-      console.log(`👤 User ID ${data.id} stored`);
-    }
-    
-    return data;
-  } catch (error: any) {
-    console.error('❌ Registration failed:', error.message);
-    throw error;
-  }
-},
+  },
 
   // Check if user has an active session via JWT
   checkSession: async (): Promise<LoginResponse | null> => {
