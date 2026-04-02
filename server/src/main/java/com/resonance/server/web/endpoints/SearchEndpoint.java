@@ -99,8 +99,7 @@ public class SearchEndpoint implements EndpointGroup {
     }
 
     private List<Map<String, Object>> searchProjects(String query, String instrument, String genre) {
-        List<Project> allProjects = Server.INSTANCE.getDatabaseManager()
-                .getAllProjects().collectList().block();
+        final List<Project> allProjects = Server.INSTANCE.getDatabaseManager().getProjects().collectList().block();
 
         if (allProjects == null || allProjects.isEmpty()) {
             return new ArrayList<>();
@@ -113,19 +112,20 @@ public class SearchEndpoint implements EndpointGroup {
 
             if (matchScore > 0) {
                 Map<String, Object> projectMap = new HashMap<>();
-                projectMap.put("id", project.id);
+                projectMap.put("id", project.id());
                 projectMap.put("type", "project");
-                projectMap.put("title", project.projectName);
-                projectMap.put("description", project.description);
-                projectMap.put("status", project.status);
-                projectMap.put("founderName", project.founderName);
-                projectMap.put("memberCount", project.memberCount);
+                projectMap.put("title", project.name());
+                projectMap.put("description", project.description());
+                projectMap.put("status", project.status());
+                projectMap.put("founderName", project.getFounder().account() == null ? "unknown" : project.getFounder().account().info().displayName());
+                projectMap.put("memberCount", project.getMemberCount());
                 projectMap.put("matchPercentage", matchScore);
-                projectMap.put("createdAt", project.createdAt);
+                projectMap.put("createdAt", project.creationDate());
 
                 // Extract unique instruments from roles
-                List<String> neededInstruments = project.roles.stream()
-                        .map(role -> role.instrument)
+                List<String> neededInstruments = Arrays.stream(project.memberRoles())
+                        .filter(role -> role.account() != null) // filter out roles that are already filled
+                        .map(Project.MemberRole::roleName)
                         .distinct()
                         .toList();
                 projectMap.put("neededInstruments", neededInstruments);
@@ -225,12 +225,12 @@ public class SearchEndpoint implements EndpointGroup {
         if (query != null && !query.isEmpty()) {
             String lowerQuery = query.toLowerCase();
 
-            if (project.projectName != null &&
-                    project.projectName.toLowerCase().contains(lowerQuery)) {
+            if (project.name() != null &&
+                    project.name().toLowerCase().contains(lowerQuery)) {
                 score += 50;
             }
-            if (project.description != null &&
-                    project.description.toLowerCase().contains(lowerQuery)) {
+            if (project.description() != null &&
+                    project.description().toLowerCase().contains(lowerQuery)) {
                 score += 30;
             }
         }
@@ -241,8 +241,8 @@ public class SearchEndpoint implements EndpointGroup {
 
         // Instrument filter - check if project needs this instrument
         if (instrument != null && !instrument.isEmpty()) {
-            boolean needsInstrument = project.roles.stream()
-                    .anyMatch(role -> role.instrument.equalsIgnoreCase(instrument));
+            boolean needsInstrument = Arrays.stream(project.memberRoles())
+                    .anyMatch(role -> role.roleName().equalsIgnoreCase(instrument));
             if (needsInstrument) {
                 score += 50;
             } else {
