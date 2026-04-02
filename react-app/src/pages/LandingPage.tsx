@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Music, Users, Calendar, Search, ChevronRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuthContext } from "../contexts/AuthContext";
 
 function App() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuthContext();
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleSearch = (e: React.FormEvent) => {
@@ -43,9 +45,9 @@ function App() {
             Moore Hall
           </a>
         </div>
-        <Link to="/userinitiation">
+        <Link to={isAuthenticated ? "/dashboard" : "/userinitiation"}>
           <button className="bg-amber-600 hover:bg-yellow-700 px-6 py-2 rounded-full font-semibold transition">
-            Get Started
+            {isAuthenticated ? "Dashboard" : "Get Started"}
           </button>
         </Link>
       </nav>
@@ -147,9 +149,9 @@ function App() {
           Join the Resonance community and find musicians at UNCP already
           creating amazing music together.
         </p>
-        <Link to="/userinitiation">
+        <Link to={isAuthenticated ? "/dashboard" : "/userinitiation"}>
           <button className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 px-10 py-4 rounded-full text-lg font-bold transition transform hover:scale-105">
-            Create Free Account
+            {isAuthenticated ? "Dashboard" : "Create Free Account"}
           </button>
         </Link>
       </section>
