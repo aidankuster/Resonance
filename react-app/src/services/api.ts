@@ -273,7 +273,7 @@ export const authAPI = {
     console.log('🚪 Logging out...');
     try {
       await fetch(`${API_BASE_URL}/api/logout`, {
-        method: 'POST',
+        method: 'GET',
         credentials: 'include', // Include cookies
       });
       console.log('✅ Logout endpoint called');
