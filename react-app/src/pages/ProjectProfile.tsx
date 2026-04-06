@@ -15,8 +15,6 @@ import {
   CheckCircle,
   AlertCircle,
   Settings,
-  Plus,
-  X,
   Guitar,
   Piano,
   Drum,
@@ -24,34 +22,30 @@ import {
   Volume2,
 } from "lucide-react";
 
-interface ProjectRole {
-  id: number;
-  projectId: number;
-  instrument: string;
-  description: string;
-  isFilled: boolean;
-  filledByUserId?: number;
-}
-
-interface ProjectMember {
-  userId: number;
-  userName: string;
-  role: string;
-  joinedAt: string;
-}
-
+// Define interface matching the actual backend response
 interface ProjectData {
   id: number;
-  projectName: string;
+  name: string;
+  founderID: number;
   description: string;
   status: string;
-  founderId: number;
-  founderName: string;
-  founderEmail: string;
-  memberCount: number;
-  roles: ProjectRole[];
-  members?: ProjectMember[];
-  createdAt: string;
+  creationDate: string;
+  memberRoles: {
+    [roleName: string]: {
+      id: number;
+      emailAddress: string;
+      enabled: boolean;
+      admin: boolean;
+      info: {
+        displayName: string;
+        bio: string;
+        availability: string;
+        experienceLevel: string;
+      };
+      instruments: string[];
+      genres: string[];
+    } | null;
+  };
 }
 
 function ProjectProfile() {
@@ -79,7 +73,6 @@ function ProjectProfile() {
 
         console.log("Loading project with ID:", id);
 
-        // Fetch project from backend
         const response = await fetch(`http://localhost:80/api/projects/${id}`);
 
         if (!response.ok) {
@@ -90,7 +83,7 @@ function ProjectProfile() {
         }
 
         const data = await response.json();
-        console.log("Project data received:", data);
+        console.log("Raw project data:", data);
         setProject(data);
       } catch (err) {
         console.error("Failed to load project:", err);
@@ -102,6 +95,45 @@ function ProjectProfile() {
 
     loadProject();
   }, [id]);
+
+  // Helper to get founder info
+  const getFounderInfo = () => {
+    if (!project?.memberRoles?.Founder) return null;
+    return project.memberRoles.Founder;
+  };
+
+  const getFounderName = () => {
+    const founder = getFounderInfo();
+    return founder?.info?.displayName || "Unknown";
+  };
+
+  const getFounderEmail = () => {
+    const founder = getFounderInfo();
+    return founder?.emailAddress || "";
+  };
+
+  // Helper to convert memberRoles object to array for easier mapping
+  const getMemberRolesArray = () => {
+    if (!project?.memberRoles) return [];
+
+    return Object.entries(project.memberRoles).map(([roleName, account]) => ({
+      roleName,
+      account,
+      isFilled: account !== null,
+    }));
+  };
+
+  const getOpenRoles = () => {
+    return getMemberRolesArray().filter(
+      (role) => !role.isFilled && role.roleName !== "Founder",
+    );
+  };
+
+  const getFilledRoles = () => {
+    return getMemberRolesArray().filter(
+      (role) => role.isFilled && role.roleName !== "Founder",
+    );
+  };
 
   const getStatusInfo = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -134,12 +166,12 @@ function ProjectProfile() {
         };
       default:
         return {
-          label: status || "Unknown",
-          color: "text-gray-400",
-          bgColor: "bg-gray-900/20",
-          borderColor: "border-gray-800/30",
-          icon: <AlertCircle className="h-5 w-5" />,
-          description: "Project status unknown",
+          label: status || "Planning",
+          color: "text-yellow-400",
+          bgColor: "bg-yellow-900/20",
+          borderColor: "border-yellow-800/30",
+          icon: <Clock className="h-5 w-5" />,
+          description: "Project is in planning phase",
         };
     }
   };
@@ -156,12 +188,16 @@ function ProjectProfile() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "Unknown";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return "Unknown";
+    }
   };
 
   if (loading) {
@@ -199,9 +235,10 @@ function ProjectProfile() {
   }
 
   const statusInfo = getStatusInfo(project.status);
-  const isFounder = currentUserId === project.founderId;
-  const openRoles = project.roles?.filter((role) => !role.isFilled) || [];
-  const filledRoles = project.roles?.filter((role) => role.isFilled) || [];
+  const isFounder = currentUserId === project.founderID;
+  const openRoles = getOpenRoles();
+  const filledRoles = getFilledRoles();
+  const memberCount = Object.keys(project.memberRoles || {}).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white">
@@ -231,7 +268,7 @@ function ProjectProfile() {
           <div className="flex flex-col md:flex-row gap-6 items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-4">
-                <h1 className="text-4xl font-bold">{project.projectName}</h1>
+                <h1 className="text-4xl font-bold">{project.name}</h1>
                 <span
                   className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.bgColor} ${statusInfo.color} border ${statusInfo.borderColor}`}
                 >
@@ -245,15 +282,15 @@ function ProjectProfile() {
               <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-4">
                 <span className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Created by {project.founderName}
+                  Created by {getFounderName()}
                 </span>
                 <span className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  Created {formatDate(project.createdAt)}
+                  Created {formatDate(project.creationDate)}
                 </span>
                 <span className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  {project.memberCount} members
+                  {memberCount} members
                 </span>
               </div>
 
@@ -271,7 +308,7 @@ function ProjectProfile() {
                 </button>
               ) : (
                 <a
-                  href={`mailto:${project.founderEmail}`}
+                  href={`mailto:${getFounderEmail()}`}
                   className="bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-full font-medium flex items-center gap-2 transition"
                 >
                   <Mail className="h-5 w-5" />
@@ -324,7 +361,7 @@ function ProjectProfile() {
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            Members ({project.memberCount})
+            Members ({memberCount})
           </button>
           {project.status === "recruiting" && (
             <button
@@ -354,16 +391,16 @@ function ProjectProfile() {
                   </h2>
                   {openRoles.length > 0 ? (
                     <div className="space-y-4">
-                      {openRoles.map((role) => (
+                      {openRoles.map((role, index) => (
                         <div
-                          key={role.id}
+                          key={index}
                           className="bg-gray-800/30 rounded-xl p-4 border border-gray-700 hover:border-amber-500/30 transition"
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                              {getInstrumentIcon(role.instrument)}
+                              {getInstrumentIcon(role.roleName)}
                               <h3 className="font-semibold text-lg">
-                                {role.instrument}
+                                {role.roleName}
                               </h3>
                             </div>
                             <span className="text-xs bg-blue-900/30 text-blue-400 px-2 py-1 rounded-full">
@@ -371,7 +408,7 @@ function ProjectProfile() {
                             </span>
                           </div>
                           <p className="text-gray-400 text-sm mb-3">
-                            {role.description}
+                            Looking for a {role.roleName} player
                           </p>
                           <button
                             onClick={() => setActiveTab("applications")}
@@ -397,20 +434,22 @@ function ProjectProfile() {
                       Filled Roles
                     </h2>
                     <div className="space-y-3">
-                      {filledRoles.map((role) => (
+                      {filledRoles.map((role, index) => (
                         <div
-                          key={role.id}
+                          key={index}
                           className="bg-gray-800/30 rounded-xl p-3 border border-gray-700"
                         >
                           <div className="flex items-center gap-2">
-                            {getInstrumentIcon(role.instrument)}
-                            <span className="font-medium">
-                              {role.instrument}
-                            </span>
+                            {getInstrumentIcon(role.roleName)}
+                            <span className="font-medium">{role.roleName}</span>
                             <span className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded-full">
                               Filled
                             </span>
                           </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Filled by:{" "}
+                            {role.account?.info?.displayName || "Unknown"}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -426,23 +465,40 @@ function ProjectProfile() {
                   Team Members
                 </h2>
                 <div className="space-y-3">
-                  {/* Founder */}
-                  <div className="bg-amber-900/20 rounded-xl p-4 border border-amber-800/30">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-full flex items-center justify-center">
-                        <User className="h-5 w-5 text-amber-400" />
+                  {/* List all members from memberRoles object */}
+                  {Object.entries(project.memberRoles).map(
+                    ([roleName, account]) => (
+                      <div
+                        key={roleName}
+                        className={`rounded-xl p-4 border ${
+                          roleName === "Founder"
+                            ? "bg-amber-900/20 border-amber-800/30"
+                            : "bg-gray-800/30 border-gray-700"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-full flex items-center justify-center">
+                            <User className="h-5 w-5 text-amber-400" />
+                          </div>
+                          <div>
+                            <p className="font-semibold">
+                              {account?.info?.displayName || "Position Open"}
+                            </p>
+                            <p
+                              className={`text-sm ${roleName === "Founder" ? "text-amber-400" : "text-blue-400"}`}
+                            >
+                              {roleName}
+                            </p>
+                            {!account && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                This position is currently open
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold">{project.founderName}</p>
-                        <p className="text-sm text-amber-400">Founder</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Other members would go here */}
-                  <p className="text-gray-500 italic text-center py-4">
-                    Member list will be populated as musicians join the project
-                  </p>
+                    ),
+                  )}
                 </div>
               </div>
             )}
@@ -458,25 +514,25 @@ function ProjectProfile() {
                   will receive your application via email.
                 </p>
                 <div className="space-y-4">
-                  {openRoles.map((role) => (
+                  {openRoles.map((role, index) => (
                     <div
-                      key={role.id}
+                      key={index}
                       className="bg-gray-800/30 rounded-xl p-4 border border-gray-700 hover:border-amber-500/30 transition"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          {getInstrumentIcon(role.instrument)}
-                          <h3 className="font-semibold">{role.instrument}</h3>
+                          {getInstrumentIcon(role.roleName)}
+                          <h3 className="font-semibold">{role.roleName}</h3>
                         </div>
                       </div>
                       <p className="text-gray-400 text-sm mb-3">
-                        {role.description}
+                        Looking for a {role.roleName} player
                       </p>
                       <a
-                        href={`mailto:${project.founderEmail}?subject=Application for ${project.projectName} - ${role.instrument}&body=Hi, I'm interested in the ${role.instrument} position for your project "${project.projectName}".%0D%0A%0D%0AHere's a bit about me:%0D%0A- I play: [your instruments]%0D%0A- My genres: [your genres]%0D%0A- My experience level: [your level]%0D%0A%0D%0ALooking forward to hearing from you!%0D%0A%0D%0ABest regards,%0D%0A[Your name]`}
+                        href={`mailto:${getFounderEmail()}?subject=Application for ${project.name} - ${role.roleName}&body=Hi, I'm interested in the ${role.roleName} position for your project "${project.name}".%0D%0A%0D%0AHere's a bit about me:%0D%0A- I play: [your instruments]%0D%0A- My genres: [your genres]%0D%0A- My experience level: [your level]%0D%0A%0D%0ALooking forward to hearing from you!%0D%0A%0D%0ABest regards,%0D%0A[Your name]`}
                         className="block w-full bg-amber-600 hover:bg-amber-700 text-center px-4 py-2 rounded-full text-sm font-medium transition"
                       >
-                        Apply for {role.instrument}
+                        Apply for {role.roleName}
                       </a>
                     </div>
                   ))}
@@ -494,24 +550,39 @@ function ProjectProfile() {
                 <div className="flex justify-between">
                   <span className="text-gray-400">Total Roles</span>
                   <span className="font-semibold">
-                    {project.roles?.length || 0}
+                    {Object.keys(project.memberRoles || {}).length}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Filled Positions</span>
                   <span className="font-semibold text-green-400">
-                    {filledRoles.length}
+                    {
+                      Object.values(project.memberRoles || {}).filter(
+                        (account) => account !== null,
+                      ).length
+                    }
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Open Positions</span>
                   <span className="font-semibold text-blue-400">
-                    {openRoles.length}
+                    {
+                      Object.entries(project.memberRoles || {}).filter(
+                        ([roleName, account]) =>
+                          account === null && roleName !== "Founder",
+                      ).length
+                    }
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Team Size</span>
-                  <span className="font-semibold">{project.memberCount}</span>
+                  <span className="font-semibold">
+                    {
+                      Object.values(project.memberRoles || {}).filter(
+                        (account) => account !== null,
+                      ).length
+                    }
+                  </span>
                 </div>
               </div>
             </div>
@@ -523,21 +594,13 @@ function ProjectProfile() {
                 <div className="flex items-center gap-3 text-gray-300">
                   <Mail className="h-5 w-5 text-amber-400" />
                   <a
-                    href={`mailto:${project.founderEmail}`}
+                    href={`mailto:${getFounderEmail()}`}
                     className="hover:text-amber-400 transition"
                   >
                     Contact Project Founder
                   </a>
                 </div>
               </div>
-            </div>
-
-            {/* Similar Projects */}
-            <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
-              <h3 className="font-bold text-lg mb-4">Similar Projects</h3>
-              <p className="text-sm text-gray-500">
-                Based on instruments and genres
-              </p>
             </div>
           </div>
         </div>
