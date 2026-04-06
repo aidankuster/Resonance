@@ -2,6 +2,7 @@ package com.resonance.server.database;
 
 import com.resonance.server.config.ConfigHolder;
 import com.resonance.server.data.Project;
+import com.resonance.server.data.Report;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.data.tags.Genre;
 import com.resonance.server.data.tags.Instrument;
@@ -20,6 +21,8 @@ import reactor.core.publisher.Mono;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.*;
 
 import static org.jooq.impl.DSL.*;
@@ -302,7 +305,7 @@ public class DatabaseManager implements AutoCloseable {
 					   );
 				   }).onErrorMap(err -> {
 					if(err instanceof IntegrityConstraintViolationException) {
-						return new AlreadyExistsException();
+						return new AlreadyExistsException("A project with this name already exists for this user.");
 					}
 					return err;
 				});
@@ -504,6 +507,66 @@ public class DatabaseManager implements AutoCloseable {
 		return this.getTags(DSL.field("type").eq(Tag.Type.INSTRUMENT)).cast(Instrument.class);
 	}
 	
+	public Mono<Report> createReport(int reporterId, int reportedId, String reason) {
+		final Timestamp timestamp = Timestamp.from(Instant.now());
+		return Mono.from(this.dsl.insertInto(
+				table("reports")).columns(
+				field("reporter_id"),
+				field("reported_id"),
+				field("reason"),
+				field("status"),
+				field("datetime")
+		).values(
+				DSL.inline(reporterId, Integer.class),
+				DSL.inline(reportedId, Integer.class),
+				DSL.inline(reason, String.class),
+				DSL.inline(Report.ReportStatus.PENDING, Report.ReportStatus.class),
+				DSL.inline(timestamp, Timestamp.class)
+		)).flatMap(i -> {
+			if(i <= 0) {
+				return Mono.error(new Exception("Failed to create report"));
+			}
+			
+			// Get the last inserted ID
+			return Mono.from(this.dsl.select(field("LAST_INSERT_ID()", Integer.class)))
+					.flatMap(record -> {
+						final int reportId = record.get(0, Integer.class);
+						return getReport(reportId);
+					});
+		});
+	}
+
+	public Flux<Report> getReports(Condition... conditions) {
+		return Flux.from(this.dsl.selectFrom(table("reports")).where(conditions))
+				.map(record -> {
+					final int id = record.get(field("report_id", Integer.class));
+					final int reporterId = record.get(field("reporter_id", Integer.class));
+					final int reportedId = record.get(field("reported_id", Integer.class));
+					final String reason = record.get(field("reason", String.class));
+					final String statusStr = record.get(field("status", String.class));
+					final Timestamp datetime = record.get(field("datetime", Timestamp.class));
+
+					Report.ReportStatus status = Report.ReportStatus.PENDING;
+					if(statusStr != null) {
+						try {
+							status = Report.ReportStatus.valueOf(statusStr);
+						} catch(IllegalArgumentException e) {
+							LOGGER.warn("Invalid report status '{}' for report {}, defaulting to PENDING", statusStr, id);
+						}
+					}
+
+					return new Report(id, reporterId, reportedId, reason, status, datetime);
+				});
+	}
+	
+	public Mono<Report> getReport(int id) {
+		final Condition condition = field("report_id", Integer.class).eq(inline(id, Integer.class));
+		return this.getReports(condition).next();
+	}
+
+	public Flux<Report> getReports() {
+		return this.getReports(DSL.trueCondition());
+	}
 	
 	// ==================== TABLE INITIALIZATION ====================
 	
@@ -617,6 +680,26 @@ public class DatabaseManager implements AutoCloseable {
 							   .onDeleteCascade(),
 					   constraint("fk_project_roles_account_id")
 							   .foreignKey("account_id")
+							   .references("user_account", "account_id")
+			   ).execute();
+			created = true;
+		}
+		
+		if(!existingTables.contains("reports")) {
+			dsl.createTable("reports")
+			   .column("report_id", SQLDataType.INTEGER.identity(true))
+			   .column("reporter_id", SQLDataType.INTEGER)
+			   .column("reported_id", SQLDataType.INTEGER)
+			   .column("reason", SQLDataType.VARCHAR(255))
+			   .column("status", SQLDataType.VARCHAR(20).asEnumDataType(Report.ReportStatus.class))
+			   .column("datetime", SQLDataType.TIMESTAMP)
+			   .constraints(
+					   primaryKey("report_id"),
+					   constraint("fk_reports_reporter_account_id")
+							   .foreignKey("reporter_id")
+							   .references("user_account", "account_id"),
+					   constraint("fk_reports_reported_account_id")
+							   .foreignKey("reported_id")
 							   .references("user_account", "account_id")
 			   ).execute();
 			created = true;

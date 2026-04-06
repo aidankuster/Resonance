@@ -93,6 +93,7 @@ public class WebServer {
 		this.endpoints.add(new ProfileEndpoint());
 		this.endpoints.add(new ProjectEndpoint());
 		this.endpoints.add(new SearchEndpoint());
+		this.endpoints.add(new ReportsEndpoint());
 	}
 	
 	public SessionHandler getSessionHandler() {
