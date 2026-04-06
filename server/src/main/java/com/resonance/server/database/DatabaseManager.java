@@ -210,10 +210,10 @@ public class DatabaseManager implements AutoCloseable {
 											   .leftJoin(table("tags"))
 											   .using(field("tag_id", Integer.class)))
 								   .where(condition))
-				   .collectList()
-				   .flatMapMany(records -> {
+				   .groupBy(record -> record.get(field("account_id", Integer.class)))
+				   .flatMap(group -> group.collectList().mapNotNull(records -> {
 					   if(records.isEmpty()) {
-						   return Flux.empty();
+						   return null;
 					   }
 					   
 					   final Record first = records.getFirst();
@@ -260,7 +260,7 @@ public class DatabaseManager implements AutoCloseable {
 						   }
 					   }
 					   
-					   return Flux.just(new UserAccount(
+					   return new UserAccount(
 							   id,
 							   email,
 							   hashedPassword,
@@ -268,8 +268,9 @@ public class DatabaseManager implements AutoCloseable {
 							   admin,
 							   new UserAccount.UserInfo(displayName, bio, availability, experienceLevel),
 							   tags.toArray(Tag[]::new)
-					   ));
-				   });
+					   );
+				   }))
+				   .filter(Objects::nonNull);
 	}
 	
 	// ==================== PROJECT METHODS ====================
