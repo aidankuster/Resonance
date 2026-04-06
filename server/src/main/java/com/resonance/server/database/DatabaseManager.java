@@ -406,73 +406,27 @@ public class DatabaseManager implements AutoCloseable {
 	}
 	
 	public Flux<Project> getProjects(Condition... conditions) {
-		return Flux.from(
-						   this.dsl.selectFrom(
-								   table("projects")
-										   .leftJoin(table("project_roles"))
-										   .using(field("project_id", Integer.class))
-										   .leftJoin(table("user_account"))
-										   .on(field("project_roles.account_id", Integer.class)
-													   .eq(field("user_account.account_id", Integer.class)))
-										   .leftJoin(table("user_account_info"))
-										   .on(field("project_roles.account_id", Integer.class)
-													   .eq(field("user_account_info.account_id", Integer.class)))
-						   ).where(conditions))
-				   .groupBy(record -> record.get(field("project_id", Integer.class)))
-				   .flatMap(group -> group.collectList().mapNotNull(records -> {
-					   if(records.isEmpty()) {
-						   return null;
-					   }
-					   
-					   final Record first = records.getFirst();
-					   
-					   final int projectID = first.get(field("project_id", Integer.class));
-					   final String name = first.get(field("name", SQLDataType.VARCHAR));
-					   final int founderID = first.get(field("founder_id", Integer.class));
-					   final String description = first.get(field("projects.description", SQLDataType.VARCHAR));
-					   final String status = first.get(field("status", SQLDataType.VARCHAR));
-					   final Date creationDate = first.get(field("creation_date", SQLDataType.DATE));
-					   
-					   final Project.MemberRole[] members = records.stream().filter(record -> record.get("email_address") != null).map(record -> {
-						   final int accountID = record.get(8, Integer.class); // user_account.account_id is at index 8
-						   final String email = record.get("email_address", String.class);
-						   final String hashedPassword = record.get("password", String.class);
-						   final boolean enabled = record.get("enabled", Boolean.class);
-						   final boolean admin = record.get("admin", Boolean.class);
-						   
-						   final String displayName = record.get("display_name", String.class);
-						   final String bio = record.get("bio", String.class);
-						   final String availability = record.get("availability", String.class);
-						   final String expLevelStr = record.get("experience_level", String.class);
-						   
-						   UserAccount.UserInfo.ExperienceLevel experienceLevel = UserAccount.UserInfo.ExperienceLevel.BEGINNER;
-						   if(expLevelStr != null) {
-							   try {
-								   experienceLevel = UserAccount.UserInfo.ExperienceLevel.valueOf(expLevelStr);
-							   } catch(IllegalArgumentException e) {
-								   LOGGER.warn("Invalid experience level '{}' for user {}, defaulting to BEGINNER", expLevelStr, accountID);
-							   }
-						   }
-						   
-						   final UserAccount userAccount = new UserAccount(
-								   accountID,
-								   email,
-								   hashedPassword,
-								   enabled,
-								   admin,
-								   new UserAccount.UserInfo(displayName, bio, availability, experienceLevel),
-								   new Tag[0] // Tags are not needed for project members
-						   );
-						   
-						   final String role = record.get("role", String.class);
-						   final String roleDescription = record.get("description", String.class);
-						   
-						   return new Project.MemberRole(projectID, userAccount, role, roleDescription);
-					   }).toArray(Project.MemberRole[]::new);
-					   
-					   return new Project(projectID, name, founderID, description, status, creationDate, members);
-				   }))
-				   .filter(Objects::nonNull);
+		return Flux.from(this.dsl.selectFrom(table("projects")).where(conditions))
+				   .flatMap(record -> {
+					   final int projectID = record.get(field("project_id", Integer.class));
+					   final String name = record.get(field("name", SQLDataType.VARCHAR));
+					   final int founderID = record.get(field("founder_id", Integer.class));
+					   final String description = record.get(field("description", SQLDataType.VARCHAR));
+					   final String status = record.get(field("status", SQLDataType.VARCHAR));
+					   final Date creationDate = record.get(field("creation_date", SQLDataType.DATE));
+
+					   return getProjectMemberRoles(projectID)
+							   .collectList()
+							   .map(members -> new Project(
+									   projectID,
+									   name,
+									   founderID,
+									   description,
+									   status,
+									   creationDate,
+									   members.toArray(Project.MemberRole[]::new)
+							   ));
+				   });
 	}
 	
 	public Flux<Project.MemberRole> getProjectMemberRoles(int projectID) {
