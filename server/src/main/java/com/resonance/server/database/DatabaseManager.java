@@ -44,34 +44,42 @@ public class DatabaseManager implements AutoCloseable {
 			throw new RuntimeException("Failed to load database config", ex);
 		}
 		
-		final String baseUrl = String.format(
-				"jdbc:%s://%s:%s/",
-				this.config.dialect.getName().toLowerCase(),
-				this.config.host,
-				this.config.port
-		);
-		
-		try {
-			Class.forName("org.mariadb.jdbc.Driver");
-			
-			try(Connection baseConnection = DriverManager.getConnection(
-					baseUrl,
-					this.config.username,
-					this.config.password
-			)) {
-				
-				var stmt = baseConnection.createStatement();
-				stmt.executeUpdate("CREATE DATABASE IF NOT EXISTS " + this.config.database);
-				LOGGER.info("Ensured database '{}' exists", this.config.database);
-			}
-			
-			final String url = String.format(
-					"jdbc:%s://%s:%s/%s",
+		final String baseUrl = switch(this.config.dialect) {
+			case SQLITE -> //sqlite is file based rather than network based
+					String.format(
+							"jdbc:%s:%s",
+							this.config.dialect.getName().toLowerCase(),
+							this.config.database + ".db"
+					);
+			default -> String.format(
+					"jdbc:%s://%s:%s",
 					this.config.dialect.getName().toLowerCase(),
 					this.config.host,
-					this.config.port,
-					this.config.database
+					this.config.port
 			);
+		};
+		
+		try {
+			//load db driver classes so they can be used
+			Class.forName("org.mariadb.jdbc.Driver");
+			Class.forName("com.mysql.cj.jdbc.Driver");
+			Class.forName("org.sqlite.JDBC");
+			
+			// SQLite is file-based and doesn't need CREATE DATABASE
+			final boolean isSqlLite = this.config.dialect.equals(SQLDialect.SQLITE);
+			if(!isSqlLite) {
+				try(Connection baseConnection = DriverManager.getConnection(
+						baseUrl,
+						this.config.username,
+						this.config.password
+				)) {
+					var stmt = baseConnection.createStatement();
+					stmt.executeUpdate("CREATE DATABASE IF NOT EXISTS " + this.config.database);
+					LOGGER.info("Ensured database '{}' exists", this.config.database);
+				}
+			}
+			
+			final String url = !isSqlLite ? baseUrl + "/" + this.config.database : baseUrl;
 			
 			this.connection = DriverManager.getConnection(url, this.config.username, this.config.password);
 			LOGGER.info("Connected to database: {}", this.config.database);
