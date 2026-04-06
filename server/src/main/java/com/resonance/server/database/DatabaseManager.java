@@ -434,32 +434,30 @@ public class DatabaseManager implements AutoCloseable {
 						   this.dsl.selectFrom(
 								   table("project_roles")
 										   .leftJoin(table("user_account"))
-										   .on(field("project_roles.account_id", Integer.class)
-													   .eq(field("user_account.account_id", Integer.class)))
+										   .using(field("account_id", Integer.class))
 										   .leftJoin(table("user_account_info"))
-										   .on(field("project_roles.account_id", Integer.class)
-													   .eq(field("user_account_info.account_id", Integer.class)))
+										   .using(field("account_id", Integer.class))
 						   ).where(field("project_id", Integer.class).eq(inline(projectID, Integer.class))))
 				   .map(record -> {
 					   final String role = record.get("role", String.class);
 					   final String description = record.get("description", String.class);
-					   
-					   final Integer accountID = record.get(field("project_roles.account_id", Integer.class));
-					   
+
+					   final Integer accountID = record.get(field("account_id", Integer.class));
+
 					   if(accountID == null) {
 						   return new Project.MemberRole(projectID, null, role, description);
 					   }
-					   
+
 					   final String email = record.get("email_address", String.class);
 					   final String hashedPassword = record.get("password", String.class);
 					   final boolean enabled = record.get("enabled", Boolean.class);
 					   final boolean admin = record.get("admin", Boolean.class);
-					   
+
 					   final String displayName = record.get("display_name", String.class);
 					   final String bio = record.get("bio", String.class);
 					   final String availability = record.get("availability", String.class);
 					   final String expLevelStr = record.get("experience_level", String.class);
-					   
+
 					   UserAccount.UserInfo.ExperienceLevel experienceLevel = UserAccount.UserInfo.ExperienceLevel.BEGINNER;
 					   if(expLevelStr != null) {
 						   try {
@@ -468,7 +466,7 @@ public class DatabaseManager implements AutoCloseable {
 							   LOGGER.warn("Invalid experience level '{}' for user {}, defaulting to BEGINNER", expLevelStr, accountID);
 						   }
 					   }
-					   
+
 					   final UserAccount userAccount = new UserAccount(
 							   accountID,
 							   email,
@@ -478,7 +476,7 @@ public class DatabaseManager implements AutoCloseable {
 							   new UserAccount.UserInfo(displayName, bio, availability, experienceLevel),
 							   new Tag[0]
 					   );
-					   
+
 					   return new Project.MemberRole(projectID, userAccount, role, description);
 				   });
 	}
