@@ -242,7 +242,11 @@ function UserProfile() {
                     </a>
                   ) : (
                     <button
-                      onClick={() => navigate("/dashboard?tab=settings")}
+                      onClick={() =>
+                        navigate(
+                          `/create-profile?edit=true&userId=${profile.id}`,
+                        )
+                      }
                       className="bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-full font-medium flex items-center gap-2 transition"
                     >
                       <User className="h-5 w-5" />

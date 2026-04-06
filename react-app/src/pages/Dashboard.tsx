@@ -227,9 +227,12 @@ function Dashboard() {
   const handleLogout = async () => {
     try {
       await authAPI.logout();
-      navigate("/", { replace: true });
+      // Force a hard navigation to clear any cached state
+      window.location.href = "/";
     } catch (error) {
       console.error("Logout failed:", error);
+      // Fallback - still try to navigate
+      window.location.href = "/";
     }
   };
 

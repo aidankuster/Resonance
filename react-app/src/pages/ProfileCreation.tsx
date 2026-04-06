@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
@@ -25,6 +25,11 @@ import type { Genre, Instrument } from "../types/apitypes";
 
 function ProfileCreation() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const isEditing = queryParams.get("edit") === "true";
+  const editUserId = queryParams.get("userId");
+
   const { login } = useAuthContext();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,11 +38,131 @@ function ProfileCreation() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [userId, setUserId] = useState<number | null>(null);
+  const [isEditingMode, setIsEditingMode] = useState(false);
 
   const [availableInstruments, setAvailableInstruments] = useState<
     Instrument[]
   >([]);
   const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
+
+  const [accountData, setAccountData] = useState<AccountFormData>({
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  const [profileData, setProfileData] = useState<ProfileFormData>({
+    displayName: "",
+    bio: "",
+    instruments: [],
+    genres: [],
+    experienceLevel: "",
+    availability: "",
+    profilePicture: null,
+    audioSamples: [],
+  });
+
+  const [formErrors, setFormErrors] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+    instruments: "",
+    genres: "",
+    experienceLevel: "",
+  });
+
+  const experienceLevels = [
+    "Beginner",
+    "Intermediate",
+    "Advanced",
+    "Professional",
+  ];
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@uncp\.edu$/;
+    const emailRegex2 = /^[^\s@]+@bravemail\.uncp\.edu$/;
+    return emailRegex.test(email) || emailRegex2.test(email);
+  };
+
+  const validatePassword = (password: string) => {
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    return passwordRegex.test(password);
+  };
+
+  const validateStep = () => {
+    switch (step) {
+      case 1:
+        if (isEditingMode) return true;
+        return (
+          validateEmail(accountData.email) &&
+          validatePassword(accountData.password) &&
+          accountData.password === accountData.confirmPassword
+        );
+      case 2:
+        return (
+          profileData.displayName.trim() !== "" &&
+          profileData.instruments.length > 0
+        );
+      case 3:
+        return (
+          profileData.genres.length >= 1 && profileData.experienceLevel !== ""
+        );
+      case 4:
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const validateCurrentStep = () => {
+    const errors = {
+      email: "",
+      password: "",
+      confirmPassword: "",
+      instruments: "",
+      genres: "",
+      experienceLevel: "",
+    };
+
+    if (step === 1 && !isEditingMode) {
+      if (!accountData.email) {
+        errors.email = "Email is required";
+      } else if (!validateEmail(accountData.email)) {
+        errors.email = "Must be a valid @bravemail.uncp.edu or @uncp.edu email";
+      }
+
+      if (!accountData.password) {
+        errors.password = "Password is required";
+      } else if (!validatePassword(accountData.password)) {
+        errors.password =
+          "Password must be at least 8 characters with uppercase, lowercase, and number";
+      }
+
+      if (!accountData.confirmPassword) {
+        errors.confirmPassword = "Please confirm your password";
+      } else if (accountData.password !== accountData.confirmPassword) {
+        errors.confirmPassword = "Passwords do not match";
+      }
+    }
+
+    if (step === 2) {
+      if (profileData.instruments.length === 0) {
+        errors.instruments = "Please select at least one instrument";
+      }
+    }
+
+    if (step === 3) {
+      if (profileData.genres.length === 0) {
+        errors.genres = "Please select at least one genre";
+      }
+      if (!profileData.experienceLevel) {
+        errors.experienceLevel = "Please select your experience level";
+      }
+    }
+
+    setFormErrors(errors);
+    return Object.values(errors).every((error) => error === "");
+  };
 
   // Fetch data from backend
   useEffect(() => {
@@ -52,6 +177,31 @@ function ProfileCreation() {
         // Fetch instruments from backend
         const instruments = await instrumentsAPI.getAll();
         setAvailableInstruments(instruments);
+
+        // Check if we're in edit mode
+        if (isEditing && editUserId) {
+          const userIdNum = parseInt(editUserId);
+          setUserId(userIdNum);
+          setIsEditingMode(true);
+
+          // Fetch existing profile data
+          const profile = await profileAPI.getCurrentUserProfile(userIdNum);
+
+          // Populate profile data with existing values
+          setProfileData({
+            displayName: profile.info.displayName || "",
+            bio: profile.info.bio || "",
+            instruments: profile.instruments || [],
+            genres: profile.genres || [],
+            experienceLevel: profile.info.experienceLevel?.toLowerCase() || "",
+            availability: profile.info.availability || "",
+            profilePicture: null,
+            audioSamples: [],
+          });
+
+          // Skip step 1 since user already has an account
+          setStep(2);
+        }
 
         setFetchError(null);
       } catch (error) {
@@ -102,125 +252,7 @@ function ProfileCreation() {
     };
 
     fetchData();
-  }, []);
-
-  const [accountData, setAccountData] = useState<AccountFormData>({
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
-
-  const [profileData, setProfileData] = useState<ProfileFormData>({
-    displayName: "",
-    bio: "",
-    instruments: [],
-    genres: [],
-    experienceLevel: "",
-    availability: "",
-    profilePicture: null,
-    audioSamples: [],
-  });
-
-  const [formErrors, setFormErrors] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-    instruments: "",
-    genres: "",
-    experienceLevel: "",
-  });
-
-  const experienceLevels = [
-    "Beginner",
-    "Intermediate",
-    "Advanced",
-    "Professional",
-  ];
-
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@uncp\.edu$/;
-    const emailRegex2 = /^[^\s@]+@bravemail\.uncp\.edu$/;
-    return emailRegex.test(email) || emailRegex2.test(email);
-  };
-
-  const validatePassword = (password: string) => {
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-    return passwordRegex.test(password);
-  };
-
-  const validateStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          validateEmail(accountData.email) &&
-          validatePassword(accountData.password) &&
-          accountData.password === accountData.confirmPassword
-        );
-      case 2:
-        return (
-          profileData.displayName.trim() !== "" &&
-          profileData.instruments.length > 0
-        );
-      case 3:
-        return (
-          profileData.genres.length >= 1 && profileData.experienceLevel !== ""
-        );
-      case 4:
-        return true;
-      default:
-        return false;
-    }
-  };
-
-  const validateCurrentStep = () => {
-    const errors = {
-      email: "",
-      password: "",
-      confirmPassword: "",
-      instruments: "",
-      genres: "",
-      experienceLevel: "",
-    };
-
-    if (step === 1) {
-      if (!accountData.email) {
-        errors.email = "Email is required";
-      } else if (!validateEmail(accountData.email)) {
-        errors.email = "Must be a valid @bravemail.uncp.edu email";
-      }
-
-      if (!accountData.password) {
-        errors.password = "Password is required";
-      } else if (!validatePassword(accountData.password)) {
-        errors.password =
-          "Password must be at least 8 characters with uppercase, lowercase, and number";
-      }
-
-      if (!accountData.confirmPassword) {
-        errors.confirmPassword = "Please confirm your password";
-      } else if (accountData.password !== accountData.confirmPassword) {
-        errors.confirmPassword = "Passwords do not match";
-      }
-    }
-
-    if (step === 2) {
-      if (profileData.instruments.length === 0) {
-        errors.instruments = "Please select at least one instrument";
-      }
-    }
-
-    if (step === 3) {
-      if (profileData.genres.length === 0) {
-        errors.genres = "Please select at least one genre";
-      }
-      if (!profileData.experienceLevel) {
-        errors.experienceLevel = "Please select your experience level";
-      }
-    }
-
-    setFormErrors(errors);
-    return Object.values(errors).every((error) => error === "");
-  };
+  }, [isEditing, editUserId]);
 
   const handleAccountChange = (field: string, value: string) => {
     setAccountData((prev) => ({ ...prev, [field]: value }));
@@ -314,8 +346,10 @@ function ProfileCreation() {
 
   // Step 4 submission - Update profile with all details
   const handleUpdateProfile = async () => {
-    if (!userId) {
-      alert("User ID not found. Please try registering again.");
+    const targetUserId = isEditingMode ? parseInt(editUserId!) : userId;
+
+    if (!targetUserId) {
+      alert("User ID not found. Please try again.");
       navigate("/userinitiation");
       return;
     }
@@ -351,24 +385,28 @@ function ProfileCreation() {
       });
 
       // Send to backend using profileAPI
-      const response = await profileAPI.updateProfile(userId, formData);
+      const response = await profileAPI.updateProfile(targetUserId, formData);
 
       console.log("Profile updated successfully:", response);
 
-      // Auto-login after profile creation
-      try {
-        const loginResponse = await login(
-          accountData.email,
-          accountData.password,
-        );
-        console.log("Auto-login successful");
-        // Session is now stored in cookie by backend, no need to store token
-      } catch (loginError) {
-        console.warn("Auto-login failed, user can login manually:", loginError);
+      // If this is a new user registration (not edit mode), auto-login
+      if (!isEditingMode) {
+        try {
+          const loginResponse = await login(
+            accountData.email,
+            accountData.password,
+          );
+          console.log("Auto-login successful");
+        } catch (loginError) {
+          console.warn(
+            "Auto-login failed, user can login manually:",
+            loginError,
+          );
+        }
       }
 
-      // Navigate to dashboard
-      navigate("/dashboard");
+      // Navigate to profile page after save
+      navigate(`/profile/${targetUserId}`);
     } catch (error: any) {
       console.error("Error updating profile:", error);
       alert(
@@ -384,7 +422,7 @@ function ProfileCreation() {
     if (e.key === "Enter" && step !== 4) {
       e.preventDefault();
       if (validateStep()) {
-        if (step === 1) {
+        if (step === 1 && !isEditingMode) {
           handleRegister();
         } else {
           handleNextStep();
@@ -427,6 +465,7 @@ function ProfileCreation() {
   const renderStep = () => {
     switch (step) {
       case 1:
+        if (isEditingMode) return null;
         return (
           <div className="space-y-8">
             <div className="space-y-6">
@@ -456,7 +495,7 @@ function ProfileCreation() {
                   </p>
                 ) : (
                   <p className="text-sm text-gray-500 mt-1">
-                    Must use your UNCP @bravemail.uncp.edu email
+                    Must use your UNCP @bravemail.uncp.edu or @uncp.edu email
                   </p>
                 )}
               </div>
@@ -546,7 +585,6 @@ function ProfileCreation() {
           </div>
         );
 
-      // ... rest of renderStep (cases 2, 3, 4 remain the same)
       case 2:
         return (
           <div className="space-y-8">
@@ -877,6 +915,14 @@ function ProfileCreation() {
     }
   };
 
+  const pageTitle = isEditingMode
+    ? "Edit Your Profile"
+    : "Create Your Musician Profile";
+  const pageSubtitle = isEditingMode
+    ? "Update your information to keep your profile current"
+    : "Complete your profile to start collaborating with UNCP musicians";
+  const submitButtonText = isEditingMode ? "Save Changes" : "Complete Profile";
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white">
       {/* Navigation */}
@@ -888,64 +934,69 @@ function ProfileCreation() {
           </span>
         </div>
         <button
-          onClick={() => navigate("/")}
+          onClick={() =>
+            navigate(isEditingMode ? `/profile/${editUserId}` : "/")
+          }
           className="text-gray-400 hover:text-white flex items-center gap-2"
         >
           <ChevronLeft className="h-5 w-5" />
-          Back to Home
+          Back
         </button>
       </nav>
 
-      {/* Progress Bar */}
+      {/* Progress Bar - Hide step 1 in edit mode since we skip it */}
       <div className="container mx-auto px-6 max-w-4xl">
         <div className="flex items-center justify-between mb-12">
           <div className="flex items-center gap-4">
-            {[1, 2, 3, 4].map((s) => (
-              <div key={s} className="flex items-center">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    step >= s ? "bg-amber-600" : "bg-gray-800"
-                  }`}
-                >
-                  {step > s ? (
-                    <div className="w-4 h-4 bg-amber-200 rounded-full" />
-                  ) : (
-                    <span className="font-bold">{s}</span>
+            {[1, 2, 3, 4].map((s) => {
+              // In edit mode, visually start at step 2 (but keep numbering)
+              const displayStep = isEditingMode && s === 1 ? null : s;
+              if (displayStep === null) return null;
+
+              const isActive = isEditingMode ? step + 1 >= s : step >= s;
+              const isCompleted = isEditingMode ? step + 1 > s : step > s;
+
+              return (
+                <div key={s} className="flex items-center">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      isActive ? "bg-amber-600" : "bg-gray-800"
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <div className="w-4 h-4 bg-amber-200 rounded-full" />
+                    ) : (
+                      <span className="font-bold">{s}</span>
+                    )}
+                  </div>
+                  {s < 4 && (
+                    <div
+                      className={`w-12 h-1 mx-2 ${
+                        isCompleted ? "bg-amber-600" : "bg-gray-800"
+                      }`}
+                    />
                   )}
                 </div>
-                {s < 4 && (
-                  <div
-                    className={`w-12 h-1 mx-2 ${
-                      step > s ? "bg-amber-600" : "bg-gray-800"
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
-          <div className="text-amber-400">Step {step} of 4</div>
+          <div className="text-amber-400">
+            Step {isEditingMode ? step + 1 : step} of 4
+          </div>
         </div>
 
         {/* Form Container */}
         <div className="bg-gray-900/50 backdrop-blur-sm rounded-3xl p-8 border border-gray-800">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold mb-2">
-              {step === 1
-                ? "Create Your Account"
-                : "Create Your Musician Profile"}
-            </h1>
-            <p className="text-gray-400">
-              {step === 1
-                ? "Start by setting up your account with UNCP credentials"
-                : "Complete your profile to start collaborating with UNCP musicians"}
-            </p>
+            <h1 className="text-4xl font-bold mb-2">{pageTitle}</h1>
+            <p className="text-gray-400">{pageSubtitle}</p>
           </div>
 
           <div>
             {renderStep()}
 
             <div className="flex justify-between mt-12 pt-8 border-t border-gray-800">
-              {step > 1 ? (
+              {(step > 1 && !isEditingMode) || (isEditingMode && step > 2) ? (
                 <button
                   type="button"
                   onClick={handlePreviousStep}
@@ -960,11 +1011,15 @@ function ProfileCreation() {
               {step < 4 ? (
                 <button
                   type="button"
-                  onClick={step === 1 ? handleRegister : handleNextStep}
+                  onClick={
+                    step === 1 && !isEditingMode
+                      ? handleRegister
+                      : handleNextStep
+                  }
                   disabled={isSubmitting}
                   className="bg-amber-600 hover:bg-amber-700 px-8 py-3 rounded-full font-semibold transition disabled:opacity-50"
                 >
-                  {step === 1
+                  {step === 1 && !isEditingMode
                     ? isSubmitting
                       ? "Creating Account..."
                       : "Continue"
@@ -979,7 +1034,7 @@ function ProfileCreation() {
                     isSubmitting ? "opacity-70 cursor-not-allowed" : ""
                   }`}
                 >
-                  {isSubmitting ? "Completing Profile..." : "Complete Profile"}
+                  {isSubmitting ? "Saving..." : submitButtonText}
                 </button>
               )}
             </div>
