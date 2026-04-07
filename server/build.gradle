@@ -36,7 +36,7 @@ dependencies {
 }
 
 application {
-	mainClass.set("com.resonance.db.server.Server")
+	mainClass.set("com.resonance.server.Server")
 }
 
 //set working directory to 'run'
