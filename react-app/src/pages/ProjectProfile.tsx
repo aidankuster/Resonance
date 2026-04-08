@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
@@ -245,12 +245,15 @@ function ProjectProfile() {
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
+          <Link
+            to="/dashboard"
+            className="flex items-center space-x-3 hover:opacity-80 transition"
+          >
             <Music className="h-8 w-8 text-amber-500" />
             <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent">
               Resonance
             </span>
-          </div>
+          </Link>
           <button
             onClick={() => navigate(-1)}
             className="text-gray-400 hover:text-white flex items-center gap-2"
@@ -302,7 +305,10 @@ function ProjectProfile() {
             {/* Action Buttons */}
             <div className="flex gap-3">
               {isFounder ? (
-                <button className="bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-full font-medium flex items-center gap-2 transition">
+                <button
+                  onClick={() => navigate(`/project/${project.id}/edit`)}
+                  className="bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-full font-medium flex items-center gap-2 transition"
+                >
                   <Settings className="h-5 w-5" />
                   Manage Project
                 </button>
@@ -363,7 +369,7 @@ function ProjectProfile() {
           >
             Members ({memberCount})
           </button>
-          {project.status === "recruiting" && (
+          {project.status === "recruiting" && !isFounder && (
             <button
               onClick={() => setActiveTab("applications")}
               className={`px-6 py-3 font-medium transition relative ${
@@ -410,12 +416,14 @@ function ProjectProfile() {
                           <p className="text-gray-400 text-sm mb-3">
                             Looking for a {role.roleName} player
                           </p>
-                          <button
-                            onClick={() => setActiveTab("applications")}
-                            className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-full text-sm font-medium transition"
-                          >
-                            Apply Now
-                          </button>
+                          {!isFounder && (
+                            <button
+                              onClick={() => setActiveTab("applications")}
+                              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-full text-sm font-medium transition"
+                            >
+                              Apply Now
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
