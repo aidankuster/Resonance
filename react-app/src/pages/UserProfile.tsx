@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
@@ -37,7 +37,7 @@ interface UserProfileData {
 function UserProfile() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { user, isAuthenticated } = useAuthContext();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfileData | null>(null);
@@ -53,35 +53,42 @@ function UserProfile() {
         setLoading(true);
         setError(null);
 
-        // Get current user ID
-        if (!isAuthenticated || !user) {
-          navigate("/userinitiation");
-          return;
-        }
-
         if (!id) {
           setError("No user ID provided");
           return;
         }
 
-        // Load both profiles in parallel
-        const [currentUserData, profileData] = await Promise.all([
-          profileAPI.getCurrentUserProfile(user.id),
-          profileAPI.getCurrentUserProfile(parseInt(id)),
-        ]);
-
-        setCurrentUserProfile(currentUserData);
+        // First, load the profile being viewed (always public)
+        const profileData = await profileAPI.getCurrentUserProfile(
+          parseInt(id),
+        );
         setProfile(profileData);
+
+        // If user is authenticated, also load their own profile for comparison
+        if (isAuthenticated && user) {
+          try {
+            const currentUserData = await profileAPI.getCurrentUserProfile(
+              user.id,
+            );
+            setCurrentUserProfile(currentUserData);
+          } catch (err) {
+            console.error("Failed to load current user profile:", err);
+          }
+        }
       } catch (err) {
         console.error("Failed to load profile:", err);
-        setError("Could not load user profile. Please try again later.");
+        if (err instanceof Error && err.message.includes("404")) {
+          setError("Profile not found");
+        } else {
+          setError("Could not load user profile. Please try again later.");
+        }
       } finally {
         setLoading(false);
       }
     };
 
     loadProfiles();
-  }, [id, navigate, isAuthenticated, user]);
+  }, [id, isAuthenticated, user]);
 
   const getExperienceLevelColor = (level: string) => {
     switch (level?.toUpperCase()) {
@@ -136,9 +143,13 @@ function UserProfile() {
   };
 
   // Check if this is the current user's own profile
-  const isOwnProfile = currentUserProfile?.id === profile?.id;
+  const isOwnProfile =
+    currentUserProfile && profile && currentUserProfile.id === profile.id;
 
-  if (loading) {
+  // No redirects - show profile page for everyone
+  // The Dashboard link is in the navigation, users can click there if they want
+
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white flex items-center justify-center">
         <div className="text-center">
@@ -149,7 +160,7 @@ function UserProfile() {
     );
   }
 
-  if (error || !profile || !currentUserProfile) {
+  if (error || !profile) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white flex items-center justify-center">
         <div className="text-center max-w-md">
@@ -160,10 +171,10 @@ function UserProfile() {
               {error || "This user profile doesn't exist or is private."}
             </p>
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate("/")}
               className="bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-full font-medium transition"
             >
-              Go Back
+              Go to Home
             </button>
           </div>
         </div>
@@ -176,12 +187,27 @@ function UserProfile() {
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
+          <Link
+            to="/"
+            className="flex items-center space-x-3 hover:opacity-80 transition"
+          >
             <Music className="h-8 w-8 text-amber-500" />
             <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent">
               Resonance
             </span>
-          </div>
+          </Link>
+
+          {/* Dashboard link for authenticated users */}
+          {isAuthenticated && (
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="text-gray-400 hover:text-white flex items-center gap-2"
+            >
+              <Users className="h-5 w-5" />
+              Dashboard
+            </button>
+          )}
+
           <button
             onClick={() => navigate(-1)}
             className="text-gray-400 hover:text-white flex items-center gap-2"
@@ -232,7 +258,7 @@ function UserProfile() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
-                  {!isOwnProfile ? (
+                  {isAuthenticated && !isOwnProfile ? (
                     <a
                       href={getMessageLink()}
                       className="bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-full font-medium flex items-center gap-2 transition"
@@ -240,7 +266,7 @@ function UserProfile() {
                       <Mail className="h-5 w-5" />
                       Message
                     </a>
-                  ) : (
+                  ) : isAuthenticated && isOwnProfile ? (
                     <button
                       onClick={() =>
                         navigate(
@@ -252,8 +278,8 @@ function UserProfile() {
                       <User className="h-5 w-5" />
                       Edit Profile
                     </button>
-                  )}
-                  {!isOwnProfile && (
+                  ) : null}
+                  {isAuthenticated && !isOwnProfile && (
                     <>
                       <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
                         <Heart className="h-5 w-5" />
