@@ -396,8 +396,23 @@ function Dashboard() {
                 onClick={handleViewProfile}
                 className="relative cursor-pointer"
               >
-                <div className="h-10 w-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center">
-                  <User className="h-6 w-6" />
+                <div className="h-10 w-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center overflow-hidden">
+                  {user && (
+                    <img
+                      src={profileAPI.getProfilePictureUrl(user.id)}
+                      alt={userProfile.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const icon = document.createElement('div');
+                          icon.innerHTML = '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                          parent.appendChild(icon.firstChild!);
+                        }
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
               </button>
@@ -414,8 +429,25 @@ function Dashboard() {
               {/* User Profile Card */}
               <div className="bg-gray-900/50 rounded-2xl p-6 mb-6 border border-gray-800">
                 <div className="flex items-center space-x-4 mb-4">
-                  <div className="h-16 w-16 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center">
-                    <User className="h-8 w-8" />
+                  <div className="h-16 w-16 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center overflow-hidden">
+                    {user ? (
+                      <img
+                        src={profileAPI.getProfilePictureUrl(user.id)}
+                        alt={userProfile.name}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            const icon = document.createElement('div');
+                            icon.innerHTML = '<svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                            parent.appendChild(icon.firstChild!);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <User className="h-8 w-8" />
+                    )}
                   </div>
                   <div>
                     <h3 className="text-xl font-bold">{userProfile.name}</h3>
@@ -590,8 +622,21 @@ function Dashboard() {
                         >
                           <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center space-x-3">
-                              <div className="h-12 w-12 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-full flex items-center justify-center">
-                                <User className="h-6 w-6 text-amber-400" />
+                              <div className="h-12 w-12 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-full flex items-center justify-center overflow-hidden">
+                                <img
+                                  src={profileAPI.getProfilePictureUrl(musician.id)}
+                                  alt={musician.displayName}
+                                  className="h-full w-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const parent = e.currentTarget.parentElement;
+                                    if (parent) {
+                                      const icon = document.createElement('div');
+                                      icon.innerHTML = '<svg class="h-6 w-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                                      parent.appendChild(icon.firstChild!);
+                                    }
+                                  }}
+                                />
                               </div>
                               <div>
                                 <h3 className="font-bold text-lg">

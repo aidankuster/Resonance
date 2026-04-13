@@ -214,6 +214,33 @@ export const profileAPI = {
   updateProfile: async (userId: number, formData: FormData): Promise<any> => {
     console.log(`📡 Updating profile for user ID: ${userId}`);
     return fetchFormData(`/api/profile/${userId}`, formData, 'POST');
+  },
+
+  // Upload profile picture (uses session, no userId needed)
+  uploadProfilePicture: async (file: File): Promise<void> => {
+    console.log(`📡 Uploading profile picture`);
+    const formData = new FormData();
+    formData.append('profile_picture', file);
+
+    const response = await fetch(`${API_BASE_URL}/api/profile/picture`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Failed to upload profile picture:`, response.status, errorText);
+      throw new Error(`Failed to upload profile picture (${response.status}): ${errorText}`);
+    }
+
+    console.log(`✅ Profile picture uploaded successfully`);
+  },
+
+  // Get profile picture URL (always .jpg)
+  getProfilePictureUrl: (userId: number): string => {
+    return `${API_BASE_URL}/api/profile/${userId}/picture`;
   }
 };
 

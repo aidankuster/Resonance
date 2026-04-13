@@ -39,6 +39,7 @@ function ProfileCreation() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [userId, setUserId] = useState<number | null>(null);
   const [isEditingMode, setIsEditingMode] = useState(false);
+  const [existingProfilePictureUrl, setExistingProfilePictureUrl] = useState<string | null>(null);
 
   const [availableInstruments, setAvailableInstruments] = useState<
     Instrument[]
@@ -198,6 +199,9 @@ function ProfileCreation() {
             profilePicture: null,
             audioSamples: [],
           });
+
+          // Load existing profile picture URL
+          setExistingProfilePictureUrl(`${profileAPI.getProfilePictureUrl(userIdNum)}?t=${Date.now()}`);
 
           // Skip step 1 since user already has an account
           setStep(2);
@@ -374,17 +378,12 @@ function ProfileCreation() {
         formData.append("tag", tag);
       });
 
-      // Add profile picture if exists
-      if (profileData.profilePicture) {
-        formData.append("profilePicture", profileData.profilePicture);
-      }
-
       // Add audio samples
       profileData.audioSamples.forEach((file) => {
         formData.append("audioSamples", file);
       });
 
-      // Send to backend using profileAPI
+      // Send profile data to backend using profileAPI
       const response = await profileAPI.updateProfile(targetUserId, formData);
 
       console.log("Profile updated successfully:", response);
@@ -402,6 +401,19 @@ function ProfileCreation() {
             "Auto-login failed, user can login manually:",
             loginError,
           );
+        }
+      }
+
+      // Upload profile picture separately if exists (after login for new users)
+      if (profileData.profilePicture) {
+        try {
+          await profileAPI.uploadProfilePicture(profileData.profilePicture);
+          console.log("Profile picture uploaded successfully");
+        } catch (picError: any) {
+          console.error("Failed to upload profile picture:", picError);
+          console.error("Error details:", picError.message);
+          // Don't fail the whole operation if just the picture fails
+          alert(`Profile saved, but profile picture upload failed: ${picError.message}. You can try uploading it again from your profile.`);
         }
       }
 
@@ -774,6 +786,13 @@ function ProfileCreation() {
                           alt="Profile preview"
                           className="h-full w-full object-cover"
                         />
+                      ) : existingProfilePictureUrl ? (
+                        <img
+                          src={existingProfilePictureUrl}
+                          alt="Current profile"
+                          className="h-full w-full object-cover"
+                          onError={() => setExistingProfilePictureUrl(null)}
+                        />
                       ) : (
                         <User className="h-10 w-10 text-gray-400" />
                       )}
@@ -790,7 +809,9 @@ function ProfileCreation() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm text-gray-300 mb-1">
-                      Upload a profile photo
+                      {existingProfilePictureUrl && !profileData.profilePicture
+                        ? "Change profile photo"
+                        : "Upload a profile photo"}
                     </p>
                     <p className="text-xs text-gray-500">
                       JPG, PNG, or GIF • Max 5MB • Square image recommended
@@ -813,7 +834,7 @@ function ProfileCreation() {
                         }
                         className="text-xs text-red-400 hover:text-red-300 mt-2"
                       >
-                        Remove photo
+                        Remove new photo
                       </button>
                     )}
                   </div>
@@ -1058,6 +1079,13 @@ function ProfileCreation() {
                         src={URL.createObjectURL(profileData.profilePicture)}
                         alt="Profile"
                         className="h-full w-full object-cover"
+                      />
+                    ) : existingProfilePictureUrl ? (
+                      <img
+                        src={existingProfilePictureUrl}
+                        alt="Current profile"
+                        className="h-full w-full object-cover"
+                        onError={() => setExistingProfilePictureUrl(null)}
                       />
                     ) : (
                       <User className="h-6 w-6 text-gray-400" />
