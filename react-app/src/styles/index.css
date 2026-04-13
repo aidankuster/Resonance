@@ -1,3 +1,266 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* UNCP Gold Override - Rich Dark Orange-Gold Version */
+:root {
+  --uncp-gold: #a86e1a;
+  --uncp-gold-warm: #b87a20;
+  --uncp-gold-deep: #965f14;
+  --uncp-brown-warm: #6e3d12;
+  --uncp-brown-deep: #542c0c;
+  --uncp-brown-dark: #3a1e08;
+}
+
+/* Override all amber-500 variations */
+.text-amber-500,
+.hover\:text-amber-500:hover,
+.text-amber-400,
+.text-amber-600 {
+  color: var(--uncp-gold-warm) !important;
+}
+
+.bg-amber-500,
+.bg-amber-600,
+.bg-amber-700,
+.hover\:bg-amber-600:hover,
+.hover\:bg-amber-700:hover {
+  background-color: var(--uncp-gold-warm) !important;
+}
+
+/* Darker hover states - better contrast for white text */
+.hover\:bg-amber-700:hover {
+  background-color: var(--uncp-gold-deep) !important;
+}
+
+/* Gradients */
+.from-amber-500,
+.from-amber-600,
+.from-amber-700 {
+  --tw-gradient-from: var(--uncp-gold-warm) !important;
+  --tw-gradient-to: rgb(184 122 32 / 0) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.to-yellow-500,
+.to-yellow-600,
+.to-yellow-700 {
+  --tw-gradient-to: var(--uncp-gold-deep) !important;
+}
+
+/* Borders */
+.border-amber-500,
+.border-amber-600,
+.border-amber-800\/30 {
+  border-color: var(--uncp-gold-warm) !important;
+}
+
+/* Ring/focus states */
+.focus\:border-amber-500:focus {
+  border-color: var(--uncp-gold-warm) !important;
+}
+
+.ring-amber-500,
+.focus\:ring-amber-500:focus {
+  --tw-ring-color: var(--uncp-gold-warm) !important;
+}
+
+/* Text gradient */
+.bg-gradient-to-r.from-amber-500.to-yellow-500,
+.bg-gradient-to-r.from-amber-600.to-yellow-600 {
+  background-image: linear-gradient(to right, var(--uncp-gold-warm), var(--uncp-gold-deep)) !important;
+}
+
+/* Background opacity variants */
+.bg-amber-500\/10 { background-color: rgb(184 122 32 / 0.1) !important; }
+.bg-amber-500\/20 { background-color: rgb(184 122 32 / 0.2) !important; }
+.bg-amber-500\/30 { background-color: rgb(184 122 32 / 0.3) !important; }
+.bg-amber-900\/10 { background-color: rgb(84 44 12 / 0.1) !important; }
+.bg-amber-900\/20 { background-color: rgb(84 44 12 / 0.2) !important; }
+.bg-amber-900\/30 { background-color: rgb(84 44 12 / 0.3) !important; }
+
+/* Text opacity variants - slightly lighter for readability */
+.text-amber-400 { color: #c98a2c !important; }
+.text-amber-300 { color: #d49830 !important; }
+.text-yellow-400 { color: #c98a2c !important; }
+.text-yellow-300 { color: #d49830 !important; }
+
+/* Background gradient clips */
+.bg-gradient-to-r.from-amber-500.to-yellow-500 {
+  --tw-gradient-from: var(--uncp-gold-warm) !important;
+  --tw-gradient-to: var(--uncp-gold-deep) !important;
+}
+
+/* Override the main page background gradients - DARKER VERSION */
+.bg-gradient-to-b.from-amber-950.to-black {
+  background-image: linear-gradient(to bottom, #2c1606, #000000) !important;
+}
+
+.bg-gradient-to-b.from-amber-950.to-black.text-white {
+  background-image: linear-gradient(to bottom, #2c1606, #000000) !important;
+}
+
+/* Welcome banner gradient */
+.bg-gradient-to-r.from-amber-900\/30.to-yellow-900\/30 {
+  background-image: linear-gradient(to right, rgb(110 61 18 / 0.3), rgb(84 44 12 / 0.3)) !important;
+}
+
+/* Profile header gradient */
+.bg-gradient-to-r.from-amber-900\/20.to-yellow-900\/20 {
+  background-image: linear-gradient(to right, rgb(110 61 18 / 0.2), rgb(84 44 12 / 0.2)) !important;
+}
+
+/* Project header gradient */
+.bg-gradient-to-r.from-amber-900\/20.to-yellow-900\/20.rounded-3xl {
+  background-image: linear-gradient(to right, rgb(110 61 18 / 0.2), rgb(84 44 12 / 0.2)) !important;
+}
+
+/* Admin dashboard header gradient */
+.bg-gradient-to-r.from-purple-900\/20.to-amber-900\/20 {
+  background-image: linear-gradient(to right, rgb(88 28 135 / 0.2), rgb(110 61 18 / 0.2)) !important;
+}
+
+/* Button gradients - darker for better white text contrast */
+.bg-gradient-to-r.from-amber-600.to-yellow-600 {
+  background-image: linear-gradient(to right, #b87a20, #965f14) !important;
+}
+
+.bg-gradient-to-r.from-amber-600.to-yellow-600:hover {
+  background-image: linear-gradient(to right, #a86e1a, #7d4f10) !important;
+}
+
+.hover\:from-amber-700:hover {
+  --tw-gradient-from: #965f14 !important;
+}
+
+.hover\:to-amber-700:hover {
+  --tw-gradient-to: #7d4f10 !important;
+}
+
+/* Avatar/profile picture gradient */
+.bg-gradient-to-br.from-amber-500.to-yellow-500 {
+  background-image: linear-gradient(to bottom right, #b87a20, #965f14) !important;
+}
+
+.bg-gradient-to-br.from-amber-500\/20.to-yellow-500\/20 {
+  background-image: linear-gradient(to bottom right, rgb(184 122 32 / 0.2), rgb(150 95 20 / 0.2)) !important;
+}
+
+/* Sidebar/navigation gradient backgrounds */
+.from-amber-950 {
+  --tw-gradient-from: #2c1606 !important;
+}
+
+.to-black {
+  --tw-gradient-to: #000000 !important;
+}
+
+/* Any remaining colors - warm dark browns */
+.bg-amber-950 {
+  background-color: #2c1606 !important;
+}
+
+.bg-amber-900 {
+  background-color: #542c0c !important;
+}
+
+.bg-amber-900\/30 {
+  background-color: rgb(84 44 12 / 0.3) !important;
+}
+
+.bg-amber-900\/50 {
+  background-color: rgb(84 44 12 / 0.5) !important;
+}
+
+.bg-yellow-900 {
+  background-color: #542c0c !important;
+}
+
+.bg-yellow-900\/30 {
+  background-color: rgb(84 44 12 / 0.3) !important;
+}
+
+/* Border colors */
+.border-amber-800\/30 {
+  border-color: rgb(110 61 18 / 0.3) !important;
+}
+
+.border-amber-800 {
+  border-color: #6e3d12 !important;
+}
+
+/* Warm hover states */
+.hover\:bg-gray-800:hover {
+  background-color: rgb(50 30 12 / 0.8) !important;
+}
+
+.bg-gray-800\/50 {
+  background-color: rgb(40 25 10 / 0.5) !important;
+}
+
+.bg-gray-900\/50 {
+  background-color: rgb(30 18 7 / 0.5) !important;
+}
+
+.bg-gray-900\/80 {
+  background-color: rgb(25 15 6 / 0.8) !important;
+}
+
+.border-gray-800 {
+  border-color: #543414 !important;
+}
+
+.border-gray-700 {
+  border-color: #6e3d12 !important;
+}
+
+/* Status colors remain distinct */
+.bg-green-900\/30 {
+  background-color: rgb(22 101 52 / 0.3) !important;
+}
+
+.bg-blue-900\/30 {
+  background-color: rgb(30 58 138 / 0.3) !important;
+}
+
+.bg-yellow-900\/30 {
+  background-color: rgb(110 61 18 / 0.3) !important;
+}
+
+.bg-red-900\/30 {
+  background-color: rgb(127 29 29 / 0.3) !important;
+}
+
+.bg-purple-900\/30 {
+  background-color: rgb(88 28 135 / 0.3) !important;
+}
+
+/* Additional rich gold touches */
+.text-amber-200 {
+  color: #d49830 !important;
+}
+
+.bg-amber-800 {
+  background-color: #6e3d12 !important;
+}
+
+.bg-amber-700 {
+  background-color: #965f14 !important;
+}
+
+.hover\:text-amber-300:hover {
+  color: #c98a2c !important;
+}
+
+.hover\:border-amber-500\/30:hover {
+  border-color: rgb(184 122 32 / 0.3) !important;
+}
+
+/* Button text - ensure white text is readable */
+button.bg-amber-600,
+button.bg-amber-700,
+a.bg-amber-600,
+a.bg-amber-700 {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
