@@ -82,4 +82,12 @@ test {
 	workingDir = file
 }
 
+tasks.register("cleanupTestRunDirectory", Delete) {
+	delete "$buildDir/test-run"
+}
+
+tasks.named("test") {
+	finalizedBy(cleanupTestRunDirectory)
+}
+
 this.build.dependsOn(this.shadowJar)
