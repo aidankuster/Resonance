@@ -1,6 +1,7 @@
 package com.resonance.server.database;
 
 import com.resonance.server.config.ConfigProvider;
+import com.resonance.server.data.AudioFile;
 import com.resonance.server.data.Project;
 import com.resonance.server.data.Report;
 import com.resonance.server.data.UserAccount;
@@ -570,7 +571,66 @@ public class DatabaseManager implements AutoCloseable {
 	public Flux<Report> getReports() {
 		return this.getReports(DSL.trueCondition());
 	}
-	
+
+	// ==================== AUDIO FILE METHODS ====================
+
+	public Mono<AudioFile> createAudioFile(int uploaderId, String fileName) {
+		final AudioFile audioFile = AudioFile.create(uploaderId, fileName);
+		return Mono.from(
+				this.dsl.insertInto(table("audio_files"))
+						.columns(
+								field("uuid"),
+								field("uploader_id"),
+								field("file_name"),
+								field("upload_date")
+						)
+						.values(
+								inline(audioFile.uuid(), String.class),
+								inline(audioFile.uploaderId(), Integer.class),
+								inline(audioFile.fileName(), String.class),
+								inline(audioFile.uploadDate(), Timestamp.class)
+						)
+		).flatMap(i -> {
+			if (i <= 0) {
+				return Mono.error(new Exception("Failed to create audio file record"));
+			}
+			return Mono.just(audioFile);
+		});
+	}
+
+	public Mono<AudioFile> getAudioFile(String uuid) {
+		return Flux.from(
+				this.dsl.selectFrom(table("audio_files"))
+						.where(field("uuid").eq(inline(uuid, String.class)))
+		).map(record -> {
+			final String id = record.get(field("uuid", String.class));
+			final int uploaderId = record.get(field("uploader_id", Integer.class));
+			final String fileName = record.get(field("file_name", String.class));
+			final Timestamp uploadDate = record.get(field("upload_date", Timestamp.class));
+			return new AudioFile(id, uploaderId, fileName, uploadDate);
+		}).next();
+	}
+
+	public Flux<AudioFile> getAudioFilesByUploader(int uploaderId) {
+		return Flux.from(
+				this.dsl.selectFrom(table("audio_files"))
+						.where(field("uploader_id").eq(inline(uploaderId, Integer.class)))
+		).map(record -> {
+			final String uuid = record.get(field("uuid", String.class));
+			final int uploaderIdFromDB = record.get(field("uploader_id", Integer.class));
+			final String fileName = record.get(field("file_name", String.class));
+			final Timestamp uploadDate = record.get(field("upload_date", Timestamp.class));
+			return new AudioFile(uuid, uploaderIdFromDB, fileName, uploadDate);
+		});
+	}
+
+	public Mono<Void> deleteAudioFile(String uuid) {
+		return Mono.from(
+				this.dsl.deleteFrom(table("audio_files"))
+						.where(field("uuid").eq(inline(uuid, String.class)))
+		).then();
+	}
+
 	// ==================== TABLE INITIALIZATION ====================
 	
 	private boolean initializeDefaultTables(DSLContext dsl) {
@@ -707,7 +767,23 @@ public class DatabaseManager implements AutoCloseable {
 			   ).execute();
 			created = true;
 		}
-		
+
+		if(!existingTables.contains("audio_files")) {
+			dsl.createTable("audio_files")
+			   .column("uuid", SQLDataType.VARCHAR(36))
+			   .column("uploader_id", SQLDataType.INTEGER)
+			   .column("file_name", SQLDataType.VARCHAR(255))
+			   .column("upload_date", SQLDataType.TIMESTAMP.defaultValue(currentTimestamp()))
+			   .constraints(
+					   primaryKey("uuid"),
+					   constraint("fk_audio_files_uploader_id")
+							   .foreignKey("uploader_id")
+							   .references("user_account", "account_id")
+							   .onDeleteCascade()
+			   ).execute();
+			created = true;
+		}
+
 		return created;
 	}
 	

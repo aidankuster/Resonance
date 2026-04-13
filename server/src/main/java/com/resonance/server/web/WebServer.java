@@ -86,6 +86,7 @@ public class WebServer implements AutoCloseable {
 		this.endpoints.add(new ProjectEndpoint());
 		this.endpoints.add(new SearchEndpoint());
 		this.endpoints.add(new ReportsEndpoint());
+		this.endpoints.add(new AudioEndpoint());
 	}
 	
 	public SessionHandler getSessionHandler() {

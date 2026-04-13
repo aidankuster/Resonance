@@ -309,3 +309,67 @@ export const authAPI = {
     }
   }
 };
+
+// Audio File Types
+export interface AudioFileResponse {
+  uuid: string;
+  uploaderId: number;
+  fileName: string;
+  uploadDate: string;
+}
+
+// Audio API
+export const audioAPI = {
+  // Upload an audio file
+  uploadAudioFile: async (file: File): Promise<AudioFileResponse> => {
+    console.log(`📡 Uploading audio file: ${file.name}`);
+    const formData = new FormData();
+    formData.append('audio_file', file);
+
+    const response = await fetch(`${API_BASE_URL}/api/audio`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Failed to upload audio file:`, response.status, errorText);
+      throw new Error(`Failed to upload audio file (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log(`✅ Audio file uploaded successfully: ${data.uuid}`);
+    return data;
+  },
+
+  // Get all audio files for current user
+  getUserAudioFiles: async (): Promise<AudioFileResponse[]> => {
+    console.log(`📡 Fetching user audio files`);
+    return fetchAPI<AudioFileResponse[]>('/api/audio');
+  },
+
+  // Delete an audio file
+  deleteAudioFile: async (uuid: string): Promise<void> => {
+    console.log(`📡 Deleting audio file: ${uuid}`);
+    const response = await fetch(`${API_BASE_URL}/api/audio/${uuid}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Failed to delete audio file:`, response.status, errorText);
+      throw new Error(`Failed to delete audio file (${response.status}): ${errorText}`);
+    }
+
+    console.log(`✅ Audio file deleted successfully`);
+  },
+
+  // Get audio file URL for playback
+  getAudioFileUrl: (uuid: string): string => {
+    return `${API_BASE_URL}/api/audio/${uuid}`;
+  }
+};
