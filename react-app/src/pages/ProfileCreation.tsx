@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
 import {
@@ -24,59 +24,6 @@ import {
 import type { AudioFileResponse } from "../services/api";
 import type { AccountFormData, ProfileFormData } from "../types/usertypes";
 import type { Genre, Instrument } from "../types/apitypes";
-
-// Audio Sample interface
-interface AudioSample {
-  id: string;
-  name: string;
-  data: string; // Base64 encoded audio
-  size: number;
-  uploadDate: string;
-}
-
-// Audio Player Component for preview
-const AudioPlayer = ({ audioData }: { audioData: string }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const togglePlay = () => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio(audioData);
-      audioRef.current.onended = () => setIsPlaying(false);
-      audioRef.current.onerror = () => {
-        console.error("Failed to load audio");
-        setIsPlaying(false);
-      };
-    }
-
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play();
-      setIsPlaying(true);
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={togglePlay}
-      className="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition"
-      title={isPlaying ? "Pause" : "Play preview"}
-    >
-      {isPlaying ? (
-        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-        </svg>
-      ) : (
-        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M8 5v14l11-7L8 5z" />
-        </svg>
-      )}
-    </button>
-  );
-};
 
 function ProfileCreation() {
   const navigate = useNavigate();
@@ -123,9 +70,6 @@ function ProfileCreation() {
     profilePicture: null,
     audioSamples: [],
   });
-
-  // Audio samples state
-  const [audioSamples, setAudioSamples] = useState<AudioSample[]>([]);
 
   const [formErrors, setFormErrors] = useState({
     email: "",
@@ -305,7 +249,7 @@ function ProfileCreation() {
           "World",
           "Musical Theatre",
           "Film Score",
-        ] as any);
+        ]);
 
         setAvailableInstruments([
           "Piano",
@@ -323,7 +267,7 @@ function ProfileCreation() {
           "Harp",
           "Synthesizer",
           "Ukulele",
-        ] as any);
+        ]);
       } finally {
         setIsLoading(false);
       }
@@ -763,23 +707,21 @@ function ProfileCreation() {
                 <div className="flex flex-wrap gap-2">
                   {availableInstruments.map((instr) => (
                     <button
-                      key={instr as string}
+                      key={instr}
                       type="button"
                       onClick={() => {
-                        const updated = profileData.instruments.includes(
-                          instr as string,
-                        )
+                        const updated = profileData.instruments.includes(instr)
                           ? profileData.instruments.filter((i) => i !== instr)
-                          : [...profileData.instruments, instr as string];
+                          : [...profileData.instruments, instr];
                         handleProfileChange("instruments", updated);
                       }}
                       className={`px-4 py-2 rounded-full transition ${
-                        profileData.instruments.includes(instr as string)
+                        profileData.instruments.includes(instr)
                           ? "bg-amber-600 text-white"
                           : "bg-gray-800 hover:bg-gray-700"
                       }`}
                     >
-                      {instr as string}
+                      {instr}
                     </button>
                   ))}
                 </div>
@@ -812,25 +754,23 @@ function ProfileCreation() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {availableGenres.map((genre) => (
                     <button
-                      key={genre as string}
+                      key={genre}
                       type="button"
                       onClick={() => {
-                        const updated = profileData.genres.includes(
-                          genre as string,
-                        )
+                        const updated = profileData.genres.includes(genre)
                           ? profileData.genres.filter((g) => g !== genre)
                           : profileData.genres.length < 5
-                            ? [...profileData.genres, genre as string]
+                            ? [...profileData.genres, genre]
                             : profileData.genres;
                         handleProfileChange("genres", updated);
                       }}
                       className={`p-4 rounded-xl border-2 transition-all ${
-                        profileData.genres.includes(genre as string)
+                        profileData.genres.includes(genre)
                           ? "border-amber-500 bg-amber-500/10"
                           : "border-gray-700 hover:border-gray-500"
                       }`}
                     >
-                      <span className="font-medium">{genre as string}</span>
+                      <span className="font-medium">{genre}</span>
                     </button>
                   ))}
                 </div>
@@ -1336,14 +1276,13 @@ function ProfileCreation() {
                     ))}
                     {profileData.audioSamples.map((file, index) => (
                       <div
-                        key={file.id}
+                        key={index}
                         className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg"
                       >
-                        <Volume2 className="h-4 w-4 text-amber-400 flex-shrink-0" />
+                        <Volume2 className="h-4 w-4 text-amber-400" />
                         <span className="text-sm truncate flex-1">
                           {file.name}
                         </span>
-                        <AudioPlayer audioData={file.data} />
                       </div>
                     ))}
                   </div>

@@ -3,7 +3,7 @@ package com.resonance.server.web.endpoints.session;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.Project;
 import com.resonance.server.data.UserAccount;
 import io.javalin.apibuilder.EndpointGroup;
@@ -86,7 +86,7 @@ public class AdminEndpoint implements EndpointGroup {
                 }
             }
 
-            ctx.result(ConfigHolder.GSON.toJson(array));
+            ctx.result(JsonConfigHolder.GSON.toJson(array));
             ctx.contentType(ContentType.APPLICATION_JSON);
 
             Server.LOGGER.info("Admin fetched all users ({} total)", users != null ? users.size() : 0);
@@ -114,7 +114,7 @@ public class AdminEndpoint implements EndpointGroup {
             }
 
             // Include sensitive info for admin view
-            ctx.result(ConfigHolder.GSON.toJson(user.toJson(true)));
+            ctx.result(JsonConfigHolder.GSON.toJson(user.toJson(true)));
             ctx.contentType(ContentType.APPLICATION_JSON);
 
         } catch (HttpResponseException e) {
@@ -230,7 +230,7 @@ public class AdminEndpoint implements EndpointGroup {
                 throw new InternalServerErrorResponse("Failed to fetch updated user");
             }
 
-            ctx.result(ConfigHolder.GSON.toJson(updated.toJson(true)));
+            ctx.result(JsonConfigHolder.GSON.toJson(updated.toJson(true)));
             ctx.contentType(ContentType.APPLICATION_JSON);
 
             Server.LOGGER.info("Admin {} {} user {} ({})",
@@ -288,7 +288,7 @@ public class AdminEndpoint implements EndpointGroup {
                 throw new InternalServerErrorResponse("Failed to fetch updated user");
             }
 
-            ctx.result(ConfigHolder.GSON.toJson(updated.toJson(true)));
+            ctx.result(JsonConfigHolder.GSON.toJson(updated.toJson(true)));
             ctx.contentType(ContentType.APPLICATION_JSON);
 
             Server.LOGGER.info("Admin {} {} admin privileges for user {} ({})",
@@ -324,7 +324,7 @@ public class AdminEndpoint implements EndpointGroup {
                 }
             }
 
-            ctx.result(ConfigHolder.GSON.toJson(array));
+            ctx.result(JsonConfigHolder.GSON.toJson(array));
             ctx.contentType(ContentType.APPLICATION_JSON);
 
             Server.LOGGER.info("Admin fetched all projects ({} total)", projects != null ? projects.size() : 0);
@@ -409,7 +409,7 @@ public class AdminEndpoint implements EndpointGroup {
             stats.addProperty("activeProjects", activeProjects);
             stats.addProperty("planningProjects", totalProjects - recruitingProjects - activeProjects);
 
-            ctx.result(ConfigHolder.GSON.toJson(stats));
+            ctx.result(JsonConfigHolder.GSON.toJson(stats));
             ctx.contentType(ContentType.APPLICATION_JSON);
 
         } catch (Throwable t) {

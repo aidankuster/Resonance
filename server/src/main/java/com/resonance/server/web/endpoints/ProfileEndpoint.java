@@ -1,7 +1,5 @@
 package com.resonance.server.web.endpoints;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 import com.resonance.server.Server;
 import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.UserAccount;
@@ -19,47 +17,57 @@ import java.util.List;
 import static io.javalin.apibuilder.ApiBuilder.*;
 
 /**
- * Profile management endpoints
- * 
- * @author John 3/20/2026
+ * @author John 2/9/2026
  */
 public class ProfileEndpoint implements EndpointGroup {
-
+	
 	private static final int MAX_PROFILE_PICTURE_SIZE = 1024 * 1024 * 5;
+	
+	private final FileResourceCollection profilePictures = new FileResourceCollection(
+			"profile_pictures",
+			uploadedFile -> {
+				if(uploadedFile.size() > MAX_PROFILE_PICTURE_SIZE) {
+					throw new BadRequestResponse("Profile picture size is too large");
+				}
 
-	private final FileResourceCollection profilePictures=new FileResourceCollection("profile_pictures",uploadedFile->{if(uploadedFile.size()>MAX_PROFILE_PICTURE_SIZE){throw new BadRequestResponse("Profile picture size is too large");}
+				// Validate content type
+				String contentType = uploadedFile.contentType();
+				if (contentType == null || !contentType.startsWith("image/")) {
+					throw new BadRequestResponse("File must be an image");
+				}
 
-	// Validate content type
-	String contentType=uploadedFile.contentType();if(contentType==null||!contentType.startsWith("image/")){throw new BadRequestResponse("File must be an image");}
+				try (final InputStream content = uploadedFile.content()) {
+					BufferedImage image = ImageIO.read(content);
 
-	try(final InputStream content=uploadedFile.content()){BufferedImage image=ImageIO.read(content);
+					if (image == null) {
+						throw new BadRequestResponse("Invalid image file");
+					}
 
-	if(image==null){throw new BadRequestResponse("Invalid image file");}
+					// Create a new BufferedImage with RGB color model (JPEG doesn't support alpha channel)
+					BufferedImage rgbImage = new BufferedImage(
+							image.getWidth(),
+							image.getHeight(),
+							BufferedImage.TYPE_INT_RGB
+					);
 
-	// Create a new BufferedImage with RGB color model (JPEG doesn't support alpha
-	// channel)
-	BufferedImage rgbImage=new BufferedImage(image.getWidth(),image.getHeight(),BufferedImage.TYPE_INT_RGB);
+					// Draw the original image onto the RGB image (removes alpha channel if present)
+					rgbImage.createGraphics().drawImage(image, 0, 0, null);
 
-	// Draw the original image onto the RGB image (removes alpha channel if present)
-	rgbImage.createGraphics().drawImage(image,0,0,null);
+					// Write the image to a byte array as JPEG
+					ByteArrayOutputStream baos = new ByteArrayOutputStream();
+					ImageIO.write(rgbImage, "jpg", baos);
 
-	// Write the image to a byte array as JPEG
-	ByteArrayOutputStream baos=new ByteArrayOutputStream();ImageIO.write(rgbImage,"jpg",baos);
+					// Return the JPEG as an InputStream
+					return new ByteArrayInputStream(baos.toByteArray());
 
-	// Return the JPEG as an InputStream
-	return new ByteArrayInputStream(baos.toByteArray());
-
-	}catch(
-	HttpResponseException e)
-	{
-		throw e;
-	}catch(
-	Exception e)
-	{
+				} catch(HttpResponseException e) {
+					throw e;
+				} catch(Exception e) {
 					throw new BadRequestResponse("Invalid image file: " + e.getMessage());
 				}
-	});
-
+			}
+	);
+	
 	@Override
 	public void addEndpoints() {
 		post("/api/profile/picture", this::handleProfilePictureUpload);
@@ -78,10 +86,7 @@ public class ProfileEndpoint implements EndpointGroup {
 		
 		final int id = ctx.pathParamAsClass("id", int.class).get();
 
-		try {
-			final UserAccount user = Server.INSTANCE.getDatabaseManager()
-					.findAccount(userId)
-					.block();
+		UserAccount account = Server.INSTANCE.getDatabaseManager().findAccount(id).block();
 
 		if (account == null) {
 			throw new NotFoundResponse("Profile not found");
@@ -91,73 +96,42 @@ public class ProfileEndpoint implements EndpointGroup {
 			// GET request - return profile data
 			ctx.result(JsonConfigHolder.GSON.toJson(account.toJson(false)));
 			ctx.contentType(ContentType.APPLICATION_JSON);
-
-		} catch (HttpResponseException e) {
-			throw e;
-		} catch (Throwable t) {
-			final Throwable error = Exceptions.unwrap(t);
-			Server.LOGGER.error("Failed to fetch user profile for {}", userId, error);
-			throw new InternalServerErrorResponse("Failed to fetch user profile: " + error.getMessage());
-		}
-	}
-
-	private void updateProfile(@NotNull Context ctx) {
-		final int userId = ctx.pathParamAsClass("userId", int.class).get();
-
-		// Validate session
-		final UserAccount currentUser = Server.INSTANCE.getWebServer()
-				.getSessionHandler().validateSession(ctx);
-
-		if (currentUser == null) {
-			throw new UnauthorizedResponse("Not authenticated");
+			return;
 		}
 
-		// Users can only update their own profile (unless admin)
-		if (currentUser.id() != userId && !currentUser.admin()) {
-			throw new ForbiddenResponse("Cannot update another user's profile");
+		// POST request - handle profile updates
+		// validate the session to make sure the user can only edit their own profile
+		if(Server.INSTANCE.getWebServer().getSessionHandler().validateSession(ctx).id() != account.id()) {
+			throw new UnauthorizedResponse("You cannot modify another user's profile");
 		}
 
-		try {
-			// Fetch existing user
-			final UserAccount existingUser = Server.INSTANCE.getDatabaseManager()
-					.findAccount(userId)
-					.block();
+		// TODO: input validation
 
-			if (existingUser == null) {
-				throw new NotFoundResponse("User not found");
-			}
+		final String displayName = ctx.formParam("display_name");
+		final String bio = ctx.formParam("bio");
+		final String availability = ctx.formParam("availability");
+		final List<String> tags = ctx.formParams("tag");
 
-			// Get form parameters
-			final String displayName = ctx.formParam("display_name");
-			final String bio = ctx.formParam("bio");
-			final String availability = ctx.formParam("availability");
-			final String experienceLevelStr = ctx.formParam("experience_level");
-			final List<String> tags = ctx.formParams("tag");
+		final UserAccount.Mutable mutableAccount = account.mutable();
+		final UserAccount.UserInfo.Mutable mutableInfo = mutableAccount.getInfo();
 
-			// Create mutable copy
-			final UserAccount.Mutable mutableUser = existingUser.mutable();
-
-			// Update info
-			if (displayName != null && !displayName.isBlank()) {
-				mutableUser.getInfo().setDisplayName(displayName);
-			}
-
-			if (bio != null) {
-				mutableUser.getInfo().setBio(bio);
-			}
-
-			if (availability != null) {
-				mutableUser.getInfo().setAvailability(availability);
-			}
-
-			if (experienceLevelStr != null && !experienceLevelStr.isBlank()) {
-				try {
-					UserAccount.UserInfo.ExperienceLevel level = UserAccount.UserInfo.ExperienceLevel
-							.valueOf(experienceLevelStr.toUpperCase());
-					mutableUser.getInfo().setExperienceLevel(level);
-				} catch (IllegalArgumentException e) {
-					Server.LOGGER.warn("Invalid experience level: {}", experienceLevelStr);
-				}
+		if (displayName != null) {
+			mutableInfo.setDisplayName(displayName);
+		}
+		if (bio != null) {
+			mutableInfo.setBio(bio);
+		}
+		if (availability != null) {
+			mutableInfo.setAvailability(availability);
+		}
+		if (ctx.formParam("experience_level") != null) {
+			String levelStr = ctx.formParam("experience_level");
+			try {
+				UserAccount.UserInfo.ExperienceLevel level = UserAccount.UserInfo.ExperienceLevel.valueOf(levelStr);
+				mutableInfo.setExperienceLevel(level);
+			} catch (IllegalArgumentException e) {
+				ctx.status(400).result("Invalid experience level: " + levelStr);
+				return;
 			}
 		}
 
@@ -190,7 +164,7 @@ public class ProfileEndpoint implements EndpointGroup {
 			throw new BadRequestResponse("No file uploaded");
 		}
 
-		// save the pfp (validator will convert to JPG)
+		//save the pfp (validator will convert to JPG)
 		this.profilePictures.putResource(id + ".jpg", uploadedFile);
 
 		ctx.status(200).result("Profile picture uploaded successfully");

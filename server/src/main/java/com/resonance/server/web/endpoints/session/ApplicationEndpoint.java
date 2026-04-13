@@ -2,7 +2,7 @@ package com.resonance.server.web.endpoints.session;
 
 import com.google.gson.JsonArray;
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.Application;
 import com.resonance.server.data.Project;
 import com.resonance.server.data.UserAccount;
@@ -49,7 +49,7 @@ public class ApplicationEndpoint implements EndpointGroup {
                 .createApplication(projectId, roleName, currentUser.id(), message)
                 .block();
 
-        ctx.status(201).result(ConfigHolder.GSON.toJson(application.toJson()));
+        ctx.status(201).result(JsonConfigHolder.GSON.toJson(application.toJson()));
         ctx.contentType(ContentType.APPLICATION_JSON);
     }
 
@@ -79,7 +79,7 @@ public class ApplicationEndpoint implements EndpointGroup {
         JsonArray array = new JsonArray();
         applications.forEach(app -> array.add(app.toJson()));
 
-        ctx.result(ConfigHolder.GSON.toJson(array));
+        ctx.result(JsonConfigHolder.GSON.toJson(array));
         ctx.contentType(ContentType.APPLICATION_JSON);
     }
 
@@ -95,7 +95,7 @@ public class ApplicationEndpoint implements EndpointGroup {
         JsonArray array = new JsonArray();
         applications.forEach(app -> array.add(app.toJson()));
 
-        ctx.result(ConfigHolder.GSON.toJson(array));
+        ctx.result(JsonConfigHolder.GSON.toJson(array));
         ctx.contentType(ContentType.APPLICATION_JSON);
     }
 
@@ -108,7 +108,7 @@ public class ApplicationEndpoint implements EndpointGroup {
                 .acceptApplication(applicationId)
                 .block();
 
-        ctx.result(ConfigHolder.GSON.toJson(updatedProject.toJson()));
+        ctx.result(JsonConfigHolder.GSON.toJson(updatedProject.toJson()));
         ctx.contentType(ContentType.APPLICATION_JSON);
     }
 
@@ -119,7 +119,7 @@ public class ApplicationEndpoint implements EndpointGroup {
                 .updateApplicationStatus(applicationId, "REJECTED")
                 .block();
 
-        ctx.result(ConfigHolder.GSON.toJson(application.toJson()));
+        ctx.result(JsonConfigHolder.GSON.toJson(application.toJson()));
         ctx.contentType(ContentType.APPLICATION_JSON);
     }
 
@@ -132,7 +132,7 @@ public class ApplicationEndpoint implements EndpointGroup {
                 .updateApplicationStatus(applicationId, "WITHDRAWN")
                 .block();
 
-        ctx.result(ConfigHolder.GSON.toJson(application.toJson()));
+        ctx.result(JsonConfigHolder.GSON.toJson(application.toJson()));
         ctx.contentType(ContentType.APPLICATION_JSON);
     }
 }

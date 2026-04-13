@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
 import {
@@ -33,15 +33,6 @@ interface UserProfileData {
   };
   instruments: string[];
   genres: string[];
-  audioSamplesData?: string;
-}
-
-interface AudioSample {
-  id: string;
-  name: string;
-  data: string;
-  size: number;
-  uploadDate: string;
 }
 
 function UserProfile() {
@@ -77,16 +68,6 @@ function UserProfile() {
           parseInt(id),
         );
         setProfile(profileData);
-
-        // Parse audio samples if they exist
-        if ((profileData as any).audioSamplesData) {
-          try {
-            const samples = JSON.parse((profileData as any).audioSamplesData);
-            setAudioSamples(samples);
-          } catch (e) {
-            console.error("Failed to parse audio samples:", e);
-          }
-        }
 
         // If user is authenticated, also load their own profile for comparison
         if (isAuthenticated && user) {
@@ -177,62 +158,6 @@ function UserProfile() {
     return level.charAt(0) + level.slice(1).toLowerCase();
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
-  };
-
-  const formatDate = (dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return "Unknown date";
-    }
-  };
-
-  const handlePlayAudio = (sample: AudioSample) => {
-    // Stop any currently playing audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-
-    // If clicking the same audio that's playing, just stop it
-    if (currentlyPlaying === sample.id) {
-      setCurrentlyPlaying(null);
-      return;
-    }
-
-    // Create and play new audio
-    const audio = new Audio(sample.data);
-    audioRef.current = audio;
-
-    audio.onended = () => {
-      setCurrentlyPlaying(null);
-      audioRef.current = null;
-    };
-
-    audio.onerror = (e) => {
-      console.error("Failed to load audio:", e);
-      setCurrentlyPlaying(null);
-      audioRef.current = null;
-    };
-
-    audio.play().catch((err) => {
-      console.error("Failed to play audio:", err);
-      setCurrentlyPlaying(null);
-      audioRef.current = null;
-    });
-
-    setCurrentlyPlaying(sample.id);
-  };
-
   const getMessageLink = () => {
     if (!profile || !currentUserProfile) return "#";
 
@@ -311,7 +236,7 @@ function UserProfile() {
       <nav className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <Link
-            to="/dashboard"
+            to="/"
             className="flex items-center space-x-3 hover:opacity-80 transition"
           >
             <Music className="h-8 w-8 text-amber-500" />
@@ -462,10 +387,8 @@ function UserProfile() {
                   <p className="text-xs text-gray-400">Genres</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-amber-400">
-                    {audioSamples.length}
-                  </p>
-                  <p className="text-xs text-gray-400">Audio Samples</p>
+                  <p className="text-2xl font-bold text-amber-400">0</p>
+                  <p className="text-xs text-gray-400">Projects</p>
                 </div>
               </div>
             </div>
@@ -613,82 +536,16 @@ function UserProfile() {
               </div>
             </div>
 
-            {/* Audio Samples */}
+            {/* Audio Samples (placeholder) */}
             <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                 <Headphones className="h-5 w-5 text-amber-400" />
                 Audio Samples
-                {audioSamples.length > 0 && (
-                  <span className="text-xs bg-amber-600 px-2 py-0.5 rounded-full">
-                    {audioSamples.length}
-                  </span>
-                )}
               </h3>
-
-              {audioSamples.length > 0 ? (
-                <div className="space-y-3">
-                  {audioSamples.map((sample) => (
-                    <div
-                      key={sample.id}
-                      className="bg-gray-800/30 rounded-xl p-3 border border-gray-700 hover:border-amber-500/30 transition"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="bg-amber-500/20 p-2 rounded-lg flex-shrink-0">
-                            <Volume2 className="h-4 w-4 text-amber-400" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className="text-sm font-medium truncate"
-                              title={sample.name}
-                            >
-                              {sample.name}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {formatFileSize(sample.size)} •{" "}
-                              {formatDate(sample.uploadDate)}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handlePlayAudio(sample)}
-                          className={`ml-3 p-2 rounded-full transition flex-shrink-0 ${
-                            currentlyPlaying === sample.id
-                              ? "bg-amber-600 text-white"
-                              : "bg-gray-700 hover:bg-gray-600 text-gray-300"
-                          }`}
-                          title={
-                            currentlyPlaying === sample.id ? "Pause" : "Play"
-                          }
-                        >
-                          {currentlyPlaying === sample.id ? (
-                            <Pause className="h-4 w-4" />
-                          ) : (
-                            <Play className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <Volume2 className="h-12 w-12 text-gray-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No audio samples yet</p>
-                  {isOwnProfile && (
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/create-profile?edit=true&userId=${profile.id}`,
-                        )
-                      }
-                      className="mt-3 text-xs text-amber-400 hover:text-amber-300 transition"
-                    >
-                      Add audio samples to your profile
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="text-center py-4">
+                <Volume2 className="h-12 w-12 text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No audio samples yet</p>
+              </div>
             </div>
 
             {/* Similar Musicians (placeholder) */}
