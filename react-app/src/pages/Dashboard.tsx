@@ -170,7 +170,7 @@ function Dashboard() {
       const totalMusicians = allUsers.length;
 
       // Fetch all projects to get total count
-      const projectsResponse = await fetch(`http://localhost:80/api/projects`, {
+      const projectsResponse = await fetch(`/api/projects`, {
         credentials: "include",
       });
 
@@ -274,7 +274,7 @@ function Dashboard() {
       console.log("🔍 Fetching projects for user ID:", userId);
 
       const response = await fetch(
-        `http://localhost:80/api/projects?founderId=${userId}`,
+        `/api/projects?founderId=${userId}`,
         {
           credentials: "include",
         },

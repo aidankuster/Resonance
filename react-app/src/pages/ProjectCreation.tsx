@@ -218,7 +218,7 @@ function ProjectCreation() {
 
       console.log("Sending project data to server...");
 
-      const response = await fetch("http://localhost:80/api/projects", {
+      const response = await fetch("/api/projects", {
         method: "POST",
         body: formData,
       });

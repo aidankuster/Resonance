@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:80';
+const API_BASE_URL = '';
 
 // Define response types based on backend responses
 export interface ProfileResponse {

@@ -110,7 +110,7 @@ function EditProject() {
 
         console.log("Loading project for editing, ID:", id);
 
-        const response = await fetch(`http://localhost:80/api/projects/${id}`);
+        const response = await fetch(`/api/projects/${id}`);
 
         if (!response.ok) {
           if (response.status === 404) {
@@ -307,7 +307,7 @@ function EditProject() {
       console.log("Updating project...");
 
       const response = await fetch(
-        `http://localhost:80/api/projects/${project.id}`,
+        `/api/projects/${project.id}`,
         {
           method: "PUT",
           body: formData,
