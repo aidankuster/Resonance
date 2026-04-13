@@ -24,6 +24,7 @@ import {
   Clock,
   TrendingUp,
   FolderOpen,
+  Shield,
 } from "lucide-react";
 
 // Define the expected response type from backend
@@ -61,6 +62,7 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState("discover");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [userProfile, setUserProfile] = useState({
     name: "",
     instrument: "",
@@ -112,6 +114,9 @@ function Dashboard() {
           await profileAPI.getCurrentUserProfile(user.id);
 
         console.log("✅ Profile data received:", profileData);
+
+        // Set admin status
+        setIsAdmin(profileData.admin || false);
 
         // Calculate profile completion
         let completion = 0;
@@ -518,6 +523,16 @@ function Dashboard() {
                   <Settings className="h-5 w-5" />
                   <span>Settings</span>
                 </button>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => navigate("/admin")}
+                    className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition text-purple-400 hover:bg-purple-900/20"
+                  >
+                    <Shield className="h-5 w-5" />
+                    <span>Admin Dashboard</span>
+                  </button>
+                )}
 
                 <button
                   onClick={handleLogout}

@@ -8,6 +8,7 @@ import ProjectCreation from "./pages/ProjectCreation";
 import UserProfile from "./pages/UserProfile";
 import ProjectProfile from "./pages/ProjectProfile";
 import EditProject from "./pages/EditProject";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/profile/:id" element={<UserProfile />} />
         <Route path="/project/:id" element={<ProjectProfile />} />
         <Route path="/project/:id/edit" element={<EditProject />} />
+        <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
     </Router>
   );

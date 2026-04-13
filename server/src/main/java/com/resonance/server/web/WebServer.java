@@ -6,6 +6,8 @@ import com.resonance.server.web.endpoints.*;
 import com.resonance.server.web.endpoints.session.LoginEndpoint;
 import com.resonance.server.web.endpoints.session.LogoutEndpoint;
 import com.resonance.server.web.endpoints.session.SessionEndpoint;
+import com.resonance.server.web.endpoints.session.AdminEndpoint;
+import com.resonance.server.web.endpoints.session.ApplicationEndpoint;
 import io.javalin.Javalin;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.staticfiles.Location;
@@ -27,7 +29,7 @@ public class WebServer {
 	 * Javalin instance
 	 */
 	private final Javalin javalin;
-	
+
 	/**
 	 * Session handler
 	 */
@@ -48,9 +50,9 @@ public class WebServer {
 		} catch (Exception ex) {
 			throw new RuntimeException("Failed to load web server config", ex);
 		}
-		
+
 		this.sessionHandler = new SessionHandler(this.config.jwt.hashSecret, this.config.jwt.expirationDuration);
-		
+
 		this.javalin = Javalin.create(config -> {
 			// Enable CORS for development
 			config.bundledPlugins.enableCors(cors -> {
@@ -74,29 +76,55 @@ public class WebServer {
 
 			// setup logging
 			config.requestLogger.http((ctx, ms) -> {
-				Server.LOGGER.info("{} {} {} {} {}ms ", ctx.ip(), ctx.method(), ctx.statusCode(),
-						ctx.host() + ctx.path(), ms.longValue());
+				Server.LOGGER.info("{} {} {} {} {}ms ",
+						ctx.ip(),
+						ctx.method(),
+						ctx.statusCode(),
+						ctx.host() + ctx.path(),
+						ms.longValue());
 			});
 		});
 
 		this.javalin.start(this.config.port);
+		Server.LOGGER.info("Web server started on port {}", this.config.port);
 	}
 
 	private void initializeEndpoints() {
+		// Authentication endpoints
 		this.endpoints.add(new RegisterEndpoint());
 		this.endpoints.add(new LoginEndpoint());
 		this.endpoints.add(new LogoutEndpoint());
 		this.endpoints.add(new SessionEndpoint());
 
+		// Data endpoints
 		this.endpoints.add(new GenresEndpoint());
 		this.endpoints.add(new InstrumentsEndpoint());
 		this.endpoints.add(new ProfileEndpoint());
 		this.endpoints.add(new ProjectEndpoint());
 		this.endpoints.add(new SearchEndpoint());
 		this.endpoints.add(new ReportsEndpoint());
+
+		// Admin endpoints
+		this.endpoints.add(new AdminEndpoint());
+
+		// Application endpoints
+		this.endpoints.add(new ApplicationEndpoint());
+
+		Server.LOGGER.info("Registered {} endpoints", this.endpoints.size());
 	}
-	
+
 	public SessionHandler getSessionHandler() {
 		return this.sessionHandler;
+	}
+
+	public Javalin getJavalin() {
+		return this.javalin;
+	}
+
+	public void stop() {
+		if (this.javalin != null) {
+			this.javalin.stop();
+			Server.LOGGER.info("Web server stopped");
+		}
 	}
 }

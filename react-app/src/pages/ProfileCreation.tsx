@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
 import {
@@ -22,6 +22,59 @@ import {
 } from "../services/api";
 import type { AccountFormData, ProfileFormData } from "../types/usertypes";
 import type { Genre, Instrument } from "../types/apitypes";
+
+// Audio Sample interface
+interface AudioSample {
+  id: string;
+  name: string;
+  data: string; // Base64 encoded audio
+  size: number;
+  uploadDate: string;
+}
+
+// Audio Player Component for preview
+const AudioPlayer = ({ audioData }: { audioData: string }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(audioData);
+      audioRef.current.onended = () => setIsPlaying(false);
+      audioRef.current.onerror = () => {
+        console.error("Failed to load audio");
+        setIsPlaying(false);
+      };
+    }
+
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={togglePlay}
+      className="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition"
+      title={isPlaying ? "Pause" : "Play preview"}
+    >
+      {isPlaying ? (
+        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+        </svg>
+      ) : (
+        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7L8 5z" />
+        </svg>
+      )}
+    </button>
+  );
+};
 
 function ProfileCreation() {
   const navigate = useNavigate();
@@ -61,6 +114,9 @@ function ProfileCreation() {
     profilePicture: null,
     audioSamples: [],
   });
+
+  // Audio samples state
+  const [audioSamples, setAudioSamples] = useState<AudioSample[]>([]);
 
   const [formErrors, setFormErrors] = useState({
     email: "",
@@ -199,6 +255,16 @@ function ProfileCreation() {
             audioSamples: [],
           });
 
+          // Parse existing audio samples if any
+          if ((profile as any).audioSamplesData) {
+            try {
+              const samples = JSON.parse((profile as any).audioSamplesData);
+              setAudioSamples(samples);
+            } catch (e) {
+              console.error("Failed to parse audio samples:", e);
+            }
+          }
+
           // Skip step 1 since user already has an account
           setStep(2);
         }
@@ -227,7 +293,7 @@ function ProfileCreation() {
           "World",
           "Musical Theatre",
           "Film Score",
-        ]);
+        ] as any);
 
         setAvailableInstruments([
           "Piano",
@@ -245,7 +311,7 @@ function ProfileCreation() {
           "Harp",
           "Synthesizer",
           "Ukulele",
-        ]);
+        ] as any);
       } finally {
         setIsLoading(false);
       }
@@ -273,12 +339,49 @@ function ProfileCreation() {
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length + profileData.audioSamples.length <= 3) {
-      setProfileData((prev) => ({
-        ...prev,
-        audioSamples: [...prev.audioSamples, ...files],
-      }));
+
+    // Check if adding these files would exceed the limit
+    if (audioSamples.length + files.length > 3) {
+      alert("You can only upload up to 3 audio samples");
+      return;
     }
+
+    files.forEach((file) => {
+      // Validate file type
+      if (!file.type.startsWith("audio/")) {
+        alert(`${file.name} is not an audio file`);
+        return;
+      }
+
+      // Validate file size (max 10MB for Base64)
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`${file.name} is too large. Maximum size is 10MB.`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64Audio = e.target?.result as string;
+        setAudioSamples((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            name: file.name,
+            data: base64Audio,
+            size: file.size,
+            uploadDate: new Date().toISOString(),
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Clear the input so the same file can be uploaded again if needed
+    e.target.value = "";
+  };
+
+  const removeAudioSample = (id: string) => {
+    setAudioSamples((prev) => prev.filter((sample) => sample.id !== id));
   };
 
   const handleProfilePictureUpload = (
@@ -299,13 +402,6 @@ function ProfileCreation() {
         profilePicture: file,
       }));
     }
-  };
-
-  const removeAudioSample = (index: number) => {
-    setProfileData((prev) => ({
-      ...prev,
-      audioSamples: prev.audioSamples.filter((_, i) => i !== index),
-    }));
   };
 
   const handleNextStep = () => {
@@ -379,10 +475,10 @@ function ProfileCreation() {
         formData.append("profilePicture", profileData.profilePicture);
       }
 
-      // Add audio samples
-      profileData.audioSamples.forEach((file) => {
-        formData.append("audioSamples", file);
-      });
+      // Add audio samples as Base64 JSON string
+      if (audioSamples.length > 0) {
+        formData.append("audioSamplesData", JSON.stringify(audioSamples));
+      }
 
       // Send to backend using profileAPI
       const response = await profileAPI.updateProfile(targetUserId, formData);
@@ -625,21 +721,23 @@ function ProfileCreation() {
                 <div className="flex flex-wrap gap-2">
                   {availableInstruments.map((instr) => (
                     <button
-                      key={instr}
+                      key={instr as string}
                       type="button"
                       onClick={() => {
-                        const updated = profileData.instruments.includes(instr)
+                        const updated = profileData.instruments.includes(
+                          instr as string,
+                        )
                           ? profileData.instruments.filter((i) => i !== instr)
-                          : [...profileData.instruments, instr];
+                          : [...profileData.instruments, instr as string];
                         handleProfileChange("instruments", updated);
                       }}
                       className={`px-4 py-2 rounded-full transition ${
-                        profileData.instruments.includes(instr)
+                        profileData.instruments.includes(instr as string)
                           ? "bg-amber-600 text-white"
                           : "bg-gray-800 hover:bg-gray-700"
                       }`}
                     >
-                      {instr}
+                      {instr as string}
                     </button>
                   ))}
                 </div>
@@ -672,23 +770,25 @@ function ProfileCreation() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {availableGenres.map((genre) => (
                     <button
-                      key={genre}
+                      key={genre as string}
                       type="button"
                       onClick={() => {
-                        const updated = profileData.genres.includes(genre)
+                        const updated = profileData.genres.includes(
+                          genre as string,
+                        )
                           ? profileData.genres.filter((g) => g !== genre)
                           : profileData.genres.length < 5
-                            ? [...profileData.genres, genre]
+                            ? [...profileData.genres, genre as string]
                             : profileData.genres;
                         handleProfileChange("genres", updated);
                       }}
                       className={`p-4 rounded-xl border-2 transition-all ${
-                        profileData.genres.includes(genre)
+                        profileData.genres.includes(genre as string)
                           ? "border-amber-500 bg-amber-500/10"
                           : "border-gray-700 hover:border-gray-500"
                       }`}
                     >
-                      <span className="font-medium">{genre}</span>
+                      <span className="font-medium">{genre as string}</span>
                     </button>
                   ))}
                 </div>
@@ -821,67 +921,76 @@ function ProfileCreation() {
               </div>
 
               {/* Audio Samples Section */}
-              <div className="border-2 border-dashed border-gray-700 rounded-2xl p-8 text-center hover:border-amber-500 transition">
-                <input
-                  type="file"
-                  id="audio-upload"
-                  accept="audio/*"
-                  multiple
-                  onChange={handleAudioUpload}
-                  className="hidden"
-                />
-                <label htmlFor="audio-upload" className="cursor-pointer">
-                  <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <h4 className="text-lg font-semibold mb-2">
-                    Upload Audio Samples
-                  </h4>
-                  <p className="text-gray-500 mb-4">
-                    MP3, WAV, or M4A files • Max 3 files, 50MB each
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      document.getElementById("audio-upload")?.click()
-                    }
-                    className="bg-gray-800 hover:bg-gray-700 px-6 py-2 rounded-full font-medium transition"
-                  >
-                    Choose Files
-                  </button>
+              <div>
+                <label className="block text-sm font-medium mb-3">
+                  Audio Samples
                 </label>
-              </div>
 
-              {profileData.audioSamples.length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="font-semibold">
-                    Uploaded Samples ({profileData.audioSamples.length}/3)
-                  </h4>
-                  {profileData.audioSamples.map((file, index) => (
-                    <div
-                      key={index}
-                      className="bg-gray-800 rounded-xl p-4 flex items-center justify-between"
+                <div className="border-2 border-dashed border-gray-700 rounded-2xl p-8 text-center hover:border-amber-500 transition">
+                  <input
+                    type="file"
+                    id="audio-upload"
+                    accept="audio/*"
+                    multiple
+                    onChange={handleAudioUpload}
+                    className="hidden"
+                  />
+                  <label htmlFor="audio-upload" className="cursor-pointer">
+                    <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <h4 className="text-lg font-semibold mb-2">
+                      Upload Audio Samples
+                    </h4>
+                    <p className="text-gray-500 mb-4">
+                      MP3, WAV, or M4A files • Max 3 files, 10MB each
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        document.getElementById("audio-upload")?.click()
+                      }
+                      className="bg-gray-800 hover:bg-gray-700 px-6 py-2 rounded-full font-medium transition"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="bg-amber-500/20 p-3 rounded-lg">
-                          <Headphones className="h-6 w-6 text-amber-400" />
+                      Choose Files
+                    </button>
+                  </label>
+                </div>
+
+                {audioSamples.length > 0 && (
+                  <div className="space-y-4 mt-4">
+                    <h4 className="font-semibold">
+                      Uploaded Samples ({audioSamples.length}/3)
+                    </h4>
+                    {audioSamples.map((file) => (
+                      <div
+                        key={file.id}
+                        className="bg-gray-800 rounded-xl p-4 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="bg-amber-500/20 p-3 rounded-lg">
+                            <Headphones className="h-6 w-6 text-amber-400" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{file.name}</p>
+                            <p className="text-sm text-gray-500">
+                              {(file.size / (1024 * 1024)).toFixed(2)} MB
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{file.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {(file.size / (1024 * 1024)).toFixed(2)} MB
-                          </p>
+                        <div className="flex items-center gap-2">
+                          <AudioPlayer audioData={file.data} />
+                          <button
+                            type="button"
+                            onClick={() => removeAudioSample(file.id)}
+                            className="text-gray-400 hover:text-red-400 p-2"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeAudioSample(index)}
-                        className="text-gray-400 hover:text-red-400 p-2"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -1115,17 +1224,18 @@ function ProfileCreation() {
                   <Headphones className="h-5 w-5" />
                   Audio Samples
                 </h4>
-                {profileData.audioSamples.length > 0 ? (
+                {audioSamples.length > 0 ? (
                   <div className="space-y-3">
-                    {profileData.audioSamples.map((file, index) => (
+                    {audioSamples.map((file) => (
                       <div
-                        key={index}
+                        key={file.id}
                         className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg"
                       >
-                        <Volume2 className="h-4 w-4 text-amber-400" />
+                        <Volume2 className="h-4 w-4 text-amber-400 flex-shrink-0" />
                         <span className="text-sm truncate flex-1">
                           {file.name}
                         </span>
+                        <AudioPlayer audioData={file.data} />
                       </div>
                     ))}
                   </div>

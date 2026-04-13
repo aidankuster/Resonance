@@ -20,6 +20,9 @@ import {
   Drum,
   Mic,
   Volume2,
+  FileText,
+  X,
+  Check,
 } from "lucide-react";
 
 // Define interface matching the actual backend response
@@ -48,6 +51,18 @@ interface ProjectData {
   };
 }
 
+interface Application {
+  id: number;
+  projectId: number;
+  roleName: string;
+  applicantId: number;
+  applicantName?: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "WITHDRAWN";
+  message: string;
+  applicationDate: string;
+  responseDate: string | null;
+}
+
 function ProjectProfile() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -56,9 +71,26 @@ function ProjectProfile() {
   const [error, setError] = useState<string | null>(null);
   const [project, setProject] = useState<ProjectData | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "members" | "applications"
+    "overview" | "members" | "applications" | "apply"
   >("overview");
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<string>("");
+  const [applicationMessage, setApplicationMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [hasPendingApplication, setHasPendingApplication] = useState<{
+    [key: string]: boolean;
+  }>({});
   const currentUserId = user?.id || null;
+
+  // Derived state - declared ONCE here
+  const isFounder = currentUserId === project?.founderID;
+  const isMember = project
+    ? Object.values(project.memberRoles || {}).some(
+        (account) => account?.id === currentUserId,
+      )
+    : false;
 
   useEffect(() => {
     const loadProject = async () => {
@@ -95,6 +127,59 @@ function ProjectProfile() {
 
     loadProject();
   }, [id]);
+
+  // Fetch applications if user is founder
+  useEffect(() => {
+    const fetchApplications = async () => {
+      if (!project || !isFounder || !id) return;
+
+      setLoadingApplications(true);
+      try {
+        const response = await fetch(
+          `http://localhost:80/api/projects/${id}/applications`,
+          { credentials: "include" },
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setApplications(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch applications:", error);
+      } finally {
+        setLoadingApplications(false);
+      }
+    };
+
+    fetchApplications();
+  }, [project, id, isFounder]);
+
+  // Check if user has pending applications for roles
+  useEffect(() => {
+    const checkUserApplications = async () => {
+      if (!currentUserId || !id || isFounder) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:80/api/applications?userId=${currentUserId}`,
+          { credentials: "include" },
+        );
+        if (response.ok) {
+          const userApps: Application[] = await response.json();
+          const pendingMap: { [key: string]: boolean } = {};
+          userApps.forEach((app) => {
+            if (app.projectId === parseInt(id) && app.status === "PENDING") {
+              pendingMap[app.roleName] = true;
+            }
+          });
+          setHasPendingApplication(pendingMap);
+        }
+      } catch (error) {
+        console.error("Failed to check user applications:", error);
+      }
+    };
+
+    checkUserApplications();
+  }, [currentUserId, id, isFounder]);
 
   // Helper to get founder info
   const getFounderInfo = () => {
@@ -200,6 +285,112 @@ function ProjectProfile() {
     }
   };
 
+  const handleApply = (roleName: string) => {
+    setSelectedRole(roleName);
+    setApplicationMessage(
+      `Hi, I'm interested in the ${roleName} position for your project "${project?.name}". I'd love to collaborate with you!`,
+    );
+    setShowApplyModal(true);
+  };
+
+  const handleSubmitApplication = async () => {
+    if (!selectedRole || !id) return;
+
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append("projectId", id);
+      formData.append("roleName", selectedRole);
+      formData.append("message", applicationMessage);
+
+      const response = await fetch("http://localhost:80/api/applications", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to submit application: ${errorText}`);
+      }
+
+      // Update pending applications map
+      setHasPendingApplication((prev) => ({
+        ...prev,
+        [selectedRole]: true,
+      }));
+
+      setShowApplyModal(false);
+      setSelectedRole("");
+      setApplicationMessage("");
+      alert(
+        "Application submitted successfully! The project founder will review it soon.",
+      );
+    } catch (error) {
+      console.error("Failed to submit application:", error);
+      alert(
+        error instanceof Error ? error.message : "Failed to submit application",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAcceptApplication = async (applicationId: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:80/api/applications/${applicationId}/accept`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to accept application");
+      }
+
+      const updatedProject = await response.json();
+      setProject(updatedProject);
+
+      // Remove from applications list
+      setApplications((prev) => prev.filter((app) => app.id !== applicationId));
+
+      alert("Application accepted! The role has been filled.");
+    } catch (error) {
+      console.error("Failed to accept application:", error);
+      alert("Failed to accept application");
+    }
+  };
+
+  const handleRejectApplication = async (applicationId: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:80/api/applications/${applicationId}/reject`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to reject application");
+      }
+
+      // Remove from applications list
+      setApplications((prev) => prev.filter((app) => app.id !== applicationId));
+
+      alert("Application rejected.");
+    } catch (error) {
+      console.error("Failed to reject application:", error);
+      alert("Failed to reject application");
+    }
+  };
+
+  const pendingApplicationsCount = applications.filter(
+    (app) => app.status === "PENDING",
+  ).length;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white flex items-center justify-center">
@@ -235,7 +426,6 @@ function ProjectProfile() {
   }
 
   const statusInfo = getStatusInfo(project.status);
-  const isFounder = currentUserId === project.founderID;
   const openRoles = getOpenRoles();
   const filledRoles = getFilledRoles();
   const memberCount = Object.keys(project.memberRoles || {}).length;
@@ -312,6 +502,11 @@ function ProjectProfile() {
                   <Settings className="h-5 w-5" />
                   Manage Project
                 </button>
+              ) : isMember ? (
+                <span className="bg-green-900/30 text-green-400 px-6 py-3 rounded-full font-medium flex items-center gap-2 border border-green-800/30">
+                  <CheckCircle className="h-5 w-5" />
+                  You're a Member
+                </span>
               ) : (
                 <a
                   href={`mailto:${getFounderEmail()}`}
@@ -369,11 +564,28 @@ function ProjectProfile() {
           >
             Members ({memberCount})
           </button>
-          {project.status === "recruiting" && !isFounder && (
+          {isFounder && (
             <button
               onClick={() => setActiveTab("applications")}
               className={`px-6 py-3 font-medium transition relative ${
                 activeTab === "applications"
+                  ? "text-amber-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-amber-400"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Applications
+              {pendingApplicationsCount > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                  {pendingApplicationsCount}
+                </span>
+              )}
+            </button>
+          )}
+          {project.status === "recruiting" && !isFounder && !isMember && (
+            <button
+              onClick={() => setActiveTab("apply")}
+              className={`px-6 py-3 font-medium transition relative ${
+                activeTab === "apply"
                   ? "text-amber-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-amber-400"
                   : "text-gray-400 hover:text-white"
               }`}
@@ -416,14 +628,20 @@ function ProjectProfile() {
                           <p className="text-gray-400 text-sm mb-3">
                             Looking for a {role.roleName} player
                           </p>
-                          {!isFounder && (
-                            <button
-                              onClick={() => setActiveTab("applications")}
-                              className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-full text-sm font-medium transition"
-                            >
-                              Apply Now
-                            </button>
-                          )}
+                          {!isFounder &&
+                            !isMember &&
+                            (hasPendingApplication[role.roleName] ? (
+                              <span className="bg-yellow-900/30 text-yellow-400 px-4 py-2 rounded-full text-sm font-medium inline-block">
+                                Application Pending
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleApply(role.roleName)}
+                                className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-full text-sm font-medium transition"
+                              >
+                                Apply Now
+                              </button>
+                            ))}
                         </div>
                       ))}
                     </div>
@@ -456,7 +674,12 @@ function ProjectProfile() {
                           </div>
                           <p className="text-xs text-gray-500 mt-1">
                             Filled by:{" "}
-                            {role.account?.info?.displayName || "Unknown"}
+                            <Link
+                              to={`/profile/${role.account?.id}`}
+                              className="text-amber-400 hover:text-amber-300"
+                            >
+                              {role.account?.info?.displayName || "Unknown"}
+                            </Link>
                           </p>
                         </div>
                       ))}
@@ -490,7 +713,16 @@ function ProjectProfile() {
                           </div>
                           <div>
                             <p className="font-semibold">
-                              {account?.info?.displayName || "Position Open"}
+                              {account ? (
+                                <Link
+                                  to={`/profile/${account.id}`}
+                                  className="hover:text-amber-400 transition"
+                                >
+                                  {account.info?.displayName || "Unnamed User"}
+                                </Link>
+                              ) : (
+                                "Position Open"
+                              )}
                             </p>
                             <p
                               className={`text-sm ${roleName === "Founder" ? "text-amber-400" : "text-blue-400"}`}
@@ -511,7 +743,121 @@ function ProjectProfile() {
               </div>
             )}
 
-            {activeTab === "applications" && (
+            {activeTab === "applications" && isFounder && (
+              <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-amber-400" />
+                  Applications
+                </h2>
+
+                {loadingApplications ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-500"></div>
+                  </div>
+                ) : applications.filter((a) => a.status === "PENDING").length >
+                  0 ? (
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-amber-400">
+                      Pending Applications
+                    </h3>
+                    {applications
+                      .filter((a) => a.status === "PENDING")
+                      .map((app) => (
+                        <div
+                          key={app.id}
+                          className="bg-gray-800/30 rounded-xl p-4 border border-gray-700"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="font-semibold text-lg">
+                                  {app.roleName}
+                                </span>
+                                <span className="text-xs bg-yellow-900/30 text-yellow-400 px-2 py-1 rounded-full">
+                                  Pending
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-400 mb-2">
+                                Applicant ID: {app.applicantId}
+                              </p>
+                              {app.message && (
+                                <div className="bg-gray-900/50 rounded-lg p-3 mb-3">
+                                  <p className="text-sm text-gray-300">
+                                    {app.message}
+                                  </p>
+                                </div>
+                              )}
+                              <p className="text-xs text-gray-500">
+                                Applied: {formatDate(app.applicationDate)}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 ml-4">
+                              <button
+                                onClick={() => handleAcceptApplication(app.id)}
+                                className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-1 transition"
+                              >
+                                <Check className="h-4 w-4" />
+                                Accept
+                              </button>
+                              <button
+                                onClick={() => handleRejectApplication(app.id)}
+                                className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-1 transition"
+                              >
+                                <X className="h-4 w-4" />
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">
+                    No pending applications
+                  </p>
+                )}
+
+                {/* Past Applications */}
+                {applications.filter((a) => a.status !== "PENDING").length >
+                  0 && (
+                  <div className="mt-6 space-y-3">
+                    <h3 className="font-medium text-gray-400">
+                      Past Applications
+                    </h3>
+                    {applications
+                      .filter((a) => a.status !== "PENDING")
+                      .map((app) => (
+                        <div
+                          key={app.id}
+                          className="bg-gray-800/20 rounded-xl p-3 border border-gray-700/50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-medium">
+                                {app.roleName}
+                              </span>
+                              <span
+                                className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                                  app.status === "ACCEPTED"
+                                    ? "bg-green-900/30 text-green-400"
+                                    : "bg-red-900/30 text-red-400"
+                                }`}
+                              >
+                                {app.status}
+                              </span>
+                            </div>
+                            <span className="text-xs text-gray-500">
+                              {formatDate(app.applicationDate)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "apply" && !isFounder && !isMember && (
               <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                   <Mail className="h-5 w-5 text-amber-400" />
@@ -519,7 +865,7 @@ function ProjectProfile() {
                 </h2>
                 <p className="text-gray-400 mb-6">
                   Select a role you'd like to apply for. The project founder
-                  will receive your application via email.
+                  will review your application.
                 </p>
                 <div className="space-y-4">
                   {openRoles.map((role, index) => (
@@ -527,21 +873,27 @@ function ProjectProfile() {
                       key={index}
                       className="bg-gray-800/30 rounded-xl p-4 border border-gray-700 hover:border-amber-500/30 transition"
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           {getInstrumentIcon(role.roleName)}
                           <h3 className="font-semibold">{role.roleName}</h3>
                         </div>
+                        {hasPendingApplication[role.roleName] ? (
+                          <span className="bg-yellow-900/30 text-yellow-400 px-4 py-2 rounded-full text-sm font-medium">
+                            Application Pending
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleApply(role.roleName)}
+                            className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-full text-sm font-medium transition"
+                          >
+                            Apply
+                          </button>
+                        )}
                       </div>
-                      <p className="text-gray-400 text-sm mb-3">
+                      <p className="text-gray-400 text-sm mt-2">
                         Looking for a {role.roleName} player
                       </p>
-                      <a
-                        href={`mailto:${getFounderEmail()}?subject=Application for ${project.name} - ${role.roleName}&body=Hi, I'm interested in the ${role.roleName} position for your project "${project.name}".%0D%0A%0D%0AHere's a bit about me:%0D%0A- I play: [your instruments]%0D%0A- My genres: [your genres]%0D%0A- My experience level: [your level]%0D%0A%0D%0ALooking forward to hearing from you!%0D%0A%0D%0ABest regards,%0D%0A[Your name]`}
-                        className="block w-full bg-amber-600 hover:bg-amber-700 text-center px-4 py-2 rounded-full text-sm font-medium transition"
-                      >
-                        Apply for {role.roleName}
-                      </a>
                     </div>
                   ))}
                 </div>
@@ -592,6 +944,14 @@ function ProjectProfile() {
                     }
                   </span>
                 </div>
+                {isFounder && pendingApplicationsCount > 0 && (
+                  <div className="flex justify-between pt-3 border-t border-gray-700">
+                    <span className="text-gray-400">Pending Applications</span>
+                    <span className="font-semibold text-yellow-400">
+                      {pendingApplicationsCount}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -613,6 +973,66 @@ function ProjectProfile() {
           </div>
         </div>
       </div>
+
+      {/* Apply Modal */}
+      {showApplyModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-2xl p-6 max-w-lg w-full mx-4 border border-gray-800">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Apply for {selectedRole}</h2>
+              <button
+                onClick={() => setShowApplyModal(false)}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-gray-400 text-sm mb-4">
+              Project: <span className="text-white">{project.name}</span>
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Message to Founder (Optional)
+                </label>
+                <textarea
+                  value={applicationMessage}
+                  onChange={(e) => setApplicationMessage(e.target.value)}
+                  rows={4}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 resize-none"
+                  placeholder="Tell the founder why you're interested in this role..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowApplyModal(false)}
+                  className="flex-1 px-4 py-3 rounded-full border border-gray-700 hover:bg-gray-800 transition"
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitApplication}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 px-4 py-3 rounded-full font-medium transition flex items-center justify-center gap-2"
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Application"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="mt-20 border-t border-gray-800 py-8">
