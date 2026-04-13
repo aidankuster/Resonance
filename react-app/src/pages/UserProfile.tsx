@@ -16,8 +16,7 @@ import {
   Share2,
   Flag,
   Users,
-  Play,
-  Pause,
+  Camera,
 } from "lucide-react";
 import { profileAPI } from "../services/api";
 
@@ -57,11 +56,10 @@ function UserProfile() {
   const [activeTab, setActiveTab] = useState<"about" | "projects" | "activity">(
     "about",
   );
-
-  // Audio samples state
-  const [audioSamples, setAudioSamples] = useState<AudioSample[]>([]);
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     const loadProfiles = async () => {
@@ -116,15 +114,48 @@ function UserProfile() {
     loadProfiles();
   }, [id, isAuthenticated, user]);
 
-  // Cleanup audio on unmount
   useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
+    // Load profile picture whenever profile changes
+    if (profile) {
+      setProfilePictureUrl(
+        `${profileAPI.getProfilePictureUrl(profile.id)}?t=${Date.now()}`,
+      );
+    }
+  }, [profile]);
+
+  const handleProfilePictureUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !profile) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size must be less than 5MB");
+      return;
+    }
+
+    try {
+      setUploadingPicture(true);
+      await profileAPI.uploadProfilePicture(file);
+
+      // Reload profile picture with cache-busting timestamp
+      setProfilePictureUrl(
+        `${profileAPI.getProfilePictureUrl(profile.id)}?t=${Date.now()}`,
+      );
+    } catch (err) {
+      console.error("Failed to upload profile picture:", err);
+      alert("Failed to upload profile picture. Please try again.");
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
 
   const getExperienceLevelColor = (level: string) => {
     switch (level?.toUpperCase()) {
@@ -317,11 +348,40 @@ function UserProfile() {
           <div className="flex flex-col md:flex-row gap-8 items-start">
             {/* Avatar */}
             <div className="relative">
-              <div className="h-32 w-32 rounded-full bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center">
-                <User className="h-16 w-16 text-white" />
+              <div className="h-32 w-32 rounded-full bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center overflow-hidden">
+                {profilePictureUrl ? (
+                  <img
+                    src={profilePictureUrl}
+                    alt={profile.info.displayName}
+                    className="h-full w-full object-cover"
+                    onError={() => setProfilePictureUrl(null)}
+                  />
+                ) : (
+                  <User className="h-16 w-16 text-white" />
+                )}
               </div>
               {profile.enabled && (
                 <div className="absolute bottom-2 right-2 h-4 w-4 bg-green-500 rounded-full border-2 border-gray-900"></div>
+              )}
+              {isOwnProfile && (
+                <label
+                  htmlFor="profile-picture-upload"
+                  className="absolute bottom-0 right-0 h-10 w-10 bg-amber-600 hover:bg-amber-700 rounded-full flex items-center justify-center cursor-pointer transition border-2 border-gray-900"
+                >
+                  {uploadingPicture ? (
+                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                  ) : (
+                    <Camera className="h-5 w-5 text-white" />
+                  )}
+                  <input
+                    id="profile-picture-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleProfilePictureUpload}
+                    disabled={uploadingPicture}
+                  />
+                </label>
               )}
             </div>
 

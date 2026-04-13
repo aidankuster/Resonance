@@ -1,7 +1,7 @@
 package com.resonance.server.web;
 
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.ConfigProvider;
 import com.resonance.server.web.endpoints.*;
 import com.resonance.server.web.endpoints.session.LoginEndpoint;
 import com.resonance.server.web.endpoints.session.LogoutEndpoint;
@@ -18,7 +18,7 @@ import java.util.List;
 /**
  * @author John 1/26/2026
  */
-public class WebServer {
+public class WebServer implements AutoCloseable {
 
 	/**
 	 * Config
@@ -40,17 +40,9 @@ public class WebServer {
 	 */
 	private final List<EndpointGroup> endpoints = new ArrayList<>();
 
-	public WebServer(Server server) {
-
+	public WebServer(ConfigProvider configProvider) {
 		// load config
-		final ConfigHolder<WebServerConfig> configHolder = new ConfigHolder<>("webserver", WebServerConfig.class);
-
-		try {
-			this.config = configHolder.loadConfig();
-		} catch (Exception ex) {
-			throw new RuntimeException("Failed to load web server config", ex);
-		}
-
+		this.config = configProvider.getWebServerConfig();
 		this.sessionHandler = new SessionHandler(this.config.jwt.hashSecret, this.config.jwt.expirationDuration);
 
 		this.javalin = Javalin.create(config -> {
@@ -103,6 +95,7 @@ public class WebServer {
 		this.endpoints.add(new ProjectEndpoint());
 		this.endpoints.add(new SearchEndpoint());
 		this.endpoints.add(new ReportsEndpoint());
+		this.endpoints.add(new AudioEndpoint());
 
 		// Admin endpoints
 		this.endpoints.add(new AdminEndpoint());
@@ -117,14 +110,23 @@ public class WebServer {
 		return this.sessionHandler;
 	}
 
-	public Javalin getJavalin() {
-		return this.javalin;
-	}
-
 	public void stop() {
 		if (this.javalin != null) {
 			this.javalin.stop();
 			Server.LOGGER.info("Web server stopped");
 		}
+	}
+
+	@Override
+	public void close() throws Exception {
+		this.javalin.stop();
+	}
+
+	public Javalin getJavalin() {
+		return this.javalin;
+	}
+
+	public WebServerConfig getConfig() {
+		return this.config;
 	}
 }

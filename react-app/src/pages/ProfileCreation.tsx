@@ -19,7 +19,9 @@ import {
   instrumentsAPI,
   profileAPI,
   authAPI,
+  audioAPI,
 } from "../services/api";
+import type { AudioFileResponse } from "../services/api";
 import type { AccountFormData, ProfileFormData } from "../types/usertypes";
 import type { Genre, Instrument } from "../types/apitypes";
 
@@ -92,6 +94,13 @@ function ProfileCreation() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [userId, setUserId] = useState<number | null>(null);
   const [isEditingMode, setIsEditingMode] = useState(false);
+  const [existingProfilePictureUrl, setExistingProfilePictureUrl] = useState<
+    string | null
+  >(null);
+  const [existingAudioFiles, setExistingAudioFiles] = useState<
+    AudioFileResponse[]
+  >([]);
+  const [audioFilesToDelete, setAudioFilesToDelete] = useState<string[]>([]);
 
   const [availableInstruments, setAvailableInstruments] = useState<
     Instrument[]
@@ -255,14 +264,17 @@ function ProfileCreation() {
             audioSamples: [],
           });
 
-          // Parse existing audio samples if any
-          if ((profile as any).audioSamplesData) {
-            try {
-              const samples = JSON.parse((profile as any).audioSamplesData);
-              setAudioSamples(samples);
-            } catch (e) {
-              console.error("Failed to parse audio samples:", e);
-            }
+          // Load existing profile picture URL
+          setExistingProfilePictureUrl(
+            `${profileAPI.getProfilePictureUrl(userIdNum)}?t=${Date.now()}`,
+          );
+
+          // Load existing audio files
+          try {
+            const audioFiles = await audioAPI.getUserAudioFiles();
+            setExistingAudioFiles(audioFiles);
+          } catch (error) {
+            console.error("Failed to load audio files:", error);
           }
 
           // Skip step 1 since user already has an account
@@ -339,49 +351,33 @@ function ProfileCreation() {
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    const totalExisting =
+      existingAudioFiles.length + profileData.audioSamples.length;
+    const availableSlots = 3 - totalExisting;
 
-    // Check if adding these files would exceed the limit
-    if (audioSamples.length + files.length > 3) {
-      alert("You can only upload up to 3 audio samples");
+    if (files.length > availableSlots) {
+      alert(
+        `You can only upload ${availableSlots} more audio file(s). Maximum is 3 total.`,
+      );
       return;
     }
 
-    files.forEach((file) => {
-      // Validate file type
+    // Validate file types and sizes
+    for (const file of files) {
       if (!file.type.startsWith("audio/")) {
         alert(`${file.name} is not an audio file`);
         return;
       }
-
-      // Validate file size (max 10MB for Base64)
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`${file.name} is too large. Maximum size is 10MB.`);
+      if (file.size > 50 * 1024 * 1024) {
+        alert(`${file.name} is too large. Maximum size is 50MB.`);
         return;
       }
+    }
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64Audio = e.target?.result as string;
-        setAudioSamples((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            name: file.name,
-            data: base64Audio,
-            size: file.size,
-            uploadDate: new Date().toISOString(),
-          },
-        ]);
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // Clear the input so the same file can be uploaded again if needed
-    e.target.value = "";
-  };
-
-  const removeAudioSample = (id: string) => {
-    setAudioSamples((prev) => prev.filter((sample) => sample.id !== id));
+    setProfileData((prev) => ({
+      ...prev,
+      audioSamples: [...prev.audioSamples, ...files],
+    }));
   };
 
   const handleProfilePictureUpload = (
@@ -402,6 +398,18 @@ function ProfileCreation() {
         profilePicture: file,
       }));
     }
+  };
+
+  const removeAudioSample = (index: number) => {
+    setProfileData((prev) => ({
+      ...prev,
+      audioSamples: prev.audioSamples.filter((_, i) => i !== index),
+    }));
+  };
+
+  const removeExistingAudioFile = (uuid: string) => {
+    setAudioFilesToDelete((prev) => [...prev, uuid]);
+    setExistingAudioFiles((prev) => prev.filter((file) => file.uuid !== uuid));
   };
 
   const handleNextStep = () => {
@@ -470,17 +478,12 @@ function ProfileCreation() {
         formData.append("tag", tag);
       });
 
-      // Add profile picture if exists
-      if (profileData.profilePicture) {
-        formData.append("profilePicture", profileData.profilePicture);
-      }
+      // Add audio samples
+      profileData.audioSamples.forEach((file) => {
+        formData.append("audioSamples", file);
+      });
 
-      // Add audio samples as Base64 JSON string
-      if (audioSamples.length > 0) {
-        formData.append("audioSamplesData", JSON.stringify(audioSamples));
-      }
-
-      // Send to backend using profileAPI
+      // Send profile data to backend using profileAPI
       const response = await profileAPI.updateProfile(targetUserId, formData);
 
       console.log("Profile updated successfully:", response);
@@ -498,6 +501,45 @@ function ProfileCreation() {
             "Auto-login failed, user can login manually:",
             loginError,
           );
+        }
+      }
+
+      // Upload profile picture separately if exists (after login for new users)
+      if (profileData.profilePicture) {
+        try {
+          await profileAPI.uploadProfilePicture(profileData.profilePicture);
+          console.log("Profile picture uploaded successfully");
+        } catch (picError: any) {
+          console.error("Failed to upload profile picture:", picError);
+          console.error("Error details:", picError.message);
+          // Don't fail the whole operation if just the picture fails
+          alert(
+            `Profile saved, but profile picture upload failed: ${picError.message}. You can try uploading it again from your profile.`,
+          );
+        }
+      }
+
+      // Delete marked audio files
+      for (const uuid of audioFilesToDelete) {
+        try {
+          await audioAPI.deleteAudioFile(uuid);
+          console.log(`Deleted audio file: ${uuid}`);
+        } catch (error) {
+          console.error(`Failed to delete audio file ${uuid}:`, error);
+        }
+      }
+
+      // Upload new audio files
+      for (const audioFile of profileData.audioSamples) {
+        try {
+          await audioAPI.uploadAudioFile(audioFile);
+          console.log(`Uploaded audio file: ${audioFile.name}`);
+        } catch (error: any) {
+          console.error(
+            `Failed to upload audio file ${audioFile.name}:`,
+            error,
+          );
+          alert(`Some audio files failed to upload: ${error.message}`);
         }
       }
 
@@ -874,6 +916,13 @@ function ProfileCreation() {
                           alt="Profile preview"
                           className="h-full w-full object-cover"
                         />
+                      ) : existingProfilePictureUrl ? (
+                        <img
+                          src={existingProfilePictureUrl}
+                          alt="Current profile"
+                          className="h-full w-full object-cover"
+                          onError={() => setExistingProfilePictureUrl(null)}
+                        />
                       ) : (
                         <User className="h-10 w-10 text-gray-400" />
                       )}
@@ -890,7 +939,9 @@ function ProfileCreation() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm text-gray-300 mb-1">
-                      Upload a profile photo
+                      {existingProfilePictureUrl && !profileData.profilePicture
+                        ? "Change profile photo"
+                        : "Upload a profile photo"}
                     </p>
                     <p className="text-xs text-gray-500">
                       JPG, PNG, or GIF • Max 5MB • Square image recommended
@@ -913,7 +964,7 @@ function ProfileCreation() {
                         }
                         className="text-xs text-red-400 hover:text-red-300 mt-2"
                       >
-                        Remove photo
+                        Remove new photo
                       </button>
                     )}
                   </div>
@@ -922,47 +973,55 @@ function ProfileCreation() {
 
               {/* Audio Samples Section */}
               <div>
-                <label className="block text-sm font-medium mb-3">
-                  Audio Samples
-                </label>
+                <h4 className="font-semibold mb-3">
+                  Audio Samples (
+                  {existingAudioFiles.length + profileData.audioSamples.length}
+                  /3)
+                </h4>
 
-                <div className="border-2 border-dashed border-gray-700 rounded-2xl p-8 text-center hover:border-amber-500 transition">
-                  <input
-                    type="file"
-                    id="audio-upload"
-                    accept="audio/*"
-                    multiple
-                    onChange={handleAudioUpload}
-                    className="hidden"
-                  />
-                  <label htmlFor="audio-upload" className="cursor-pointer">
-                    <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h4 className="text-lg font-semibold mb-2">
-                      Upload Audio Samples
-                    </h4>
-                    <p className="text-gray-500 mb-4">
-                      MP3, WAV, or M4A files • Max 3 files, 10MB each
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        document.getElementById("audio-upload")?.click()
-                      }
-                      className="bg-gray-800 hover:bg-gray-700 px-6 py-2 rounded-full font-medium transition"
-                    >
-                      Choose Files
-                    </button>
-                  </label>
-                </div>
-
-                {audioSamples.length > 0 && (
-                  <div className="space-y-4 mt-4">
-                    <h4 className="font-semibold">
-                      Uploaded Samples ({audioSamples.length}/3)
-                    </h4>
-                    {audioSamples.map((file) => (
+                {/* Existing Audio Files */}
+                {existingAudioFiles.length > 0 && (
+                  <div className="space-y-3 mb-4">
+                    {existingAudioFiles.map((file) => (
                       <div
-                        key={file.id}
+                        key={file.uuid}
+                        className="bg-gray-800 rounded-xl p-4 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="bg-green-500/20 p-3 rounded-lg">
+                            <Headphones className="h-6 w-6 text-green-400" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium">{file.fileName}</p>
+                            <p className="text-sm text-gray-500">
+                              Uploaded{" "}
+                              {new Date(file.uploadDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <audio
+                            controls
+                            src={audioAPI.getAudioFileUrl(file.uuid)}
+                            className="h-10"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeExistingAudioFile(file.uuid)}
+                          className="text-gray-400 hover:text-red-400 p-2 ml-2"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* New Audio Files */}
+                {profileData.audioSamples.length > 0 && (
+                  <div className="space-y-3 mb-4">
+                    {profileData.audioSamples.map((file, index) => (
+                      <div
+                        key={index}
                         className="bg-gray-800 rounded-xl p-4 flex items-center justify-between"
                       >
                         <div className="flex items-center gap-4">
@@ -972,22 +1031,52 @@ function ProfileCreation() {
                           <div>
                             <p className="font-medium">{file.name}</p>
                             <p className="text-sm text-gray-500">
-                              {(file.size / (1024 * 1024)).toFixed(2)} MB
+                              {(file.size / (1024 * 1024)).toFixed(2)} MB • New
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <AudioPlayer audioData={file.data} />
-                          <button
-                            type="button"
-                            onClick={() => removeAudioSample(file.id)}
-                            className="text-gray-400 hover:text-red-400 p-2"
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeAudioSample(index)}
+                          className="text-gray-400 hover:text-red-400 p-2"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Upload Button */}
+                {existingAudioFiles.length + profileData.audioSamples.length <
+                  3 && (
+                  <div className="border-2 border-dashed border-gray-700 rounded-2xl p-8 text-center hover:border-amber-500 transition">
+                    <input
+                      type="file"
+                      id="audio-upload"
+                      accept="audio/*"
+                      multiple
+                      onChange={handleAudioUpload}
+                      className="hidden"
+                    />
+                    <label htmlFor="audio-upload" className="cursor-pointer">
+                      <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <h4 className="text-lg font-semibold mb-2">
+                        Upload Audio Samples
+                      </h4>
+                      <p className="text-gray-500 mb-4">
+                        MP3, WAV, or M4A files • Max 3 files total, 50MB each
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          document.getElementById("audio-upload")?.click()
+                        }
+                        className="bg-gray-800 hover:bg-gray-700 px-6 py-2 rounded-full font-medium transition"
+                      >
+                        Choose Files
+                      </button>
+                    </label>
                   </div>
                 )}
               </div>
@@ -1168,6 +1257,13 @@ function ProfileCreation() {
                         alt="Profile"
                         className="h-full w-full object-cover"
                       />
+                    ) : existingProfilePictureUrl ? (
+                      <img
+                        src={existingProfilePictureUrl}
+                        alt="Current profile"
+                        className="h-full w-full object-cover"
+                        onError={() => setExistingProfilePictureUrl(null)}
+                      />
                     ) : (
                       <User className="h-6 w-6 text-gray-400" />
                     )}
@@ -1224,9 +1320,21 @@ function ProfileCreation() {
                   <Headphones className="h-5 w-5" />
                   Audio Samples
                 </h4>
-                {audioSamples.length > 0 ? (
+                {existingAudioFiles.length + profileData.audioSamples.length >
+                0 ? (
                   <div className="space-y-3">
-                    {audioSamples.map((file) => (
+                    {existingAudioFiles.map((file) => (
+                      <div
+                        key={file.uuid}
+                        className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg"
+                      >
+                        <Volume2 className="h-4 w-4 text-green-400" />
+                        <span className="text-sm truncate flex-1">
+                          {file.fileName}
+                        </span>
+                      </div>
+                    ))}
+                    {profileData.audioSamples.map((file, index) => (
                       <div
                         key={file.id}
                         className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg"

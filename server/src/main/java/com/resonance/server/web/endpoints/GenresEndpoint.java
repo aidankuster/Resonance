@@ -2,7 +2,7 @@ package com.resonance.server.web.endpoints;
 
 import com.google.gson.JsonArray;
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.tags.Genre;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.ContentType;
@@ -38,7 +38,7 @@ public class GenresEndpoint implements EndpointGroup {
 			array.add(genre.getName());
 		}
 		
-		ctx.result(ConfigHolder.GSON.toJson(array));
+		ctx.result(JsonConfigHolder.GSON.toJson(array));
 		ctx.contentType(ContentType.APPLICATION_JSON);
 	}
 }

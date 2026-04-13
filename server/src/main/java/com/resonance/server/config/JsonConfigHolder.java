@@ -11,7 +11,7 @@ import java.io.*;
  *
  * @author John 1/21/2026
  */
-public class ConfigHolder<T> {
+public class JsonConfigHolder<T> {
 	
 	/**
 	 * The GSON instance
@@ -46,7 +46,7 @@ public class ConfigHolder<T> {
 	 */
 	private final Class<T> clazz;
 	
-	public ConfigHolder(String name, Class<T> clazz) {
+	public JsonConfigHolder(String name, Class<T> clazz) {
 		this.name = name;
 		this.file = new File(CONFIG_DIR, name + ".json");
 		this.clazz = clazz;

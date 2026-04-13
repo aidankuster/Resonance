@@ -2,7 +2,7 @@ package com.resonance.server.web.endpoints;
 
 import com.password4j.Password;
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.exception.AlreadyExistsException;
 import io.javalin.apibuilder.EndpointGroup;
@@ -71,7 +71,7 @@ public class RegisterEndpoint implements EndpointGroup {
 		//store session
 		Server.INSTANCE.getWebServer().getSessionHandler().storeSession(account, ctx);
 		
-		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
+		ctx.result(JsonConfigHolder.GSON.toJson(account.toJson(false)));
 		ctx.contentType(ContentType.APPLICATION_JSON);
 		ctx.status(201);
 	}

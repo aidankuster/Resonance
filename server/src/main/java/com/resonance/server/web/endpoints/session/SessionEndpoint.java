@@ -1,7 +1,7 @@
 package com.resonance.server.web.endpoints.session;
 
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.UserAccount;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.ContentType;
@@ -29,7 +29,7 @@ public class SessionEndpoint implements EndpointGroup {
 		final UserAccount account = Server.INSTANCE.getWebServer().getSessionHandler().validateSession(ctx);
 		
 		// Return profile info
-		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
+		ctx.result(JsonConfigHolder.GSON.toJson(account.toJson(false)));
 		ctx.contentType(ContentType.APPLICATION_JSON);
 	}
 }

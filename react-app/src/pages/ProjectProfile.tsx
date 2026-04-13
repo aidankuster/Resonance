@@ -105,7 +105,7 @@ function ProjectProfile() {
 
         console.log("Loading project with ID:", id);
 
-        const response = await fetch(`http://localhost:80/api/projects/${id}`);
+        const response = await fetch(`/api/projects/${id}`);
 
         if (!response.ok) {
           if (response.status === 404) {

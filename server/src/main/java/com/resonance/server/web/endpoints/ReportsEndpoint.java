@@ -2,7 +2,7 @@ package com.resonance.server.web.endpoints;
 
 import com.google.gson.JsonArray;
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.Report;
 import com.resonance.server.data.UserAccount;
 import io.javalin.apibuilder.EndpointGroup;
@@ -45,7 +45,7 @@ public class ReportsEndpoint implements EndpointGroup {
 		}
 		
 		ctx.contentType(ContentType.APPLICATION_JSON);
-		ctx.result(ConfigHolder.GSON.toJson(reportsArray));
+		ctx.result(JsonConfigHolder.GSON.toJson(reportsArray));
 	}
 	
 	private void updateReport(@NotNull Context ctx) {
@@ -69,7 +69,7 @@ public class ReportsEndpoint implements EndpointGroup {
 		}
 		
 		ctx.contentType(ContentType.APPLICATION_JSON);
-		ctx.result(ConfigHolder.GSON.toJson(report.toJson()));
+		ctx.result(JsonConfigHolder.GSON.toJson(report.toJson()));
 	}
 	
 	private void createReport(@NotNull Context ctx) {
@@ -91,7 +91,7 @@ public class ReportsEndpoint implements EndpointGroup {
 		}
 		
 		ctx.contentType(ContentType.APPLICATION_JSON);
-		ctx.result(ConfigHolder.GSON.toJson(report.toJson()));
+		ctx.result(JsonConfigHolder.GSON.toJson(report.toJson()));
 	}
 	
 }
