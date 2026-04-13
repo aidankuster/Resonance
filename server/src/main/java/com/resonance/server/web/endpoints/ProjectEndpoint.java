@@ -4,7 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.Project;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.exception.AlreadyExistsException;
@@ -92,7 +92,7 @@ public class ProjectEndpoint implements EndpointGroup {
 
                 final Project.Mutable mutableProject = project.mutable();
 
-                final JsonArray rolesArray = ConfigHolder.GSON.fromJson(roles, JsonArray.class);
+                final JsonArray rolesArray = JsonConfigHolder.GSON.fromJson(roles, JsonArray.class);
 
                 for (JsonElement memberRole : rolesArray) {
                     final JsonObject memberRoleObj = memberRole.getAsJsonObject();
@@ -119,7 +119,7 @@ public class ProjectEndpoint implements EndpointGroup {
             }
         }
 
-        ctx.result(ConfigHolder.GSON.toJson(project.toJson()));
+        ctx.result(JsonConfigHolder.GSON.toJson(project.toJson()));
         ctx.contentType(ContentType.APPLICATION_JSON);
         ctx.status(201);
     }
@@ -147,7 +147,7 @@ public class ProjectEndpoint implements EndpointGroup {
             }
         }
 
-        ctx.result(ConfigHolder.GSON.toJson(array));
+        ctx.result(JsonConfigHolder.GSON.toJson(array));
         ctx.contentType(ContentType.APPLICATION_JSON);
     }
 
@@ -160,7 +160,7 @@ public class ProjectEndpoint implements EndpointGroup {
         }
 
         // return data about the project
-        ctx.result(ConfigHolder.GSON.toJson(project.toJson()));
+        ctx.result(JsonConfigHolder.GSON.toJson(project.toJson()));
         ctx.contentType(ContentType.APPLICATION_JSON);
     }
 
@@ -210,7 +210,7 @@ public class ProjectEndpoint implements EndpointGroup {
 
             if (rolesJson != null && !rolesJson.isBlank()) {
                 try {
-                    final JsonArray rolesArray = ConfigHolder.GSON.fromJson(rolesJson, JsonArray.class);
+                    final JsonArray rolesArray = JsonConfigHolder.GSON.fromJson(rolesJson, JsonArray.class);
 
                     // Get existing member roles and preserve the founder
                     final java.util.LinkedHashSet<Project.MemberRole> currentRoles = mutableProject.getMemberRoles();
@@ -275,7 +275,7 @@ public class ProjectEndpoint implements EndpointGroup {
             }
 
             // Return the updated project
-            ctx.result(ConfigHolder.GSON.toJson(updatedProject.toJson()));
+            ctx.result(JsonConfigHolder.GSON.toJson(updatedProject.toJson()));
             ctx.contentType(ContentType.APPLICATION_JSON);
             ctx.status(200);
 
@@ -382,7 +382,7 @@ public class ProjectEndpoint implements EndpointGroup {
                 throw new InternalServerErrorResponse("Failed to update project");
             }
 
-            ctx.result(ConfigHolder.GSON.toJson(updatedProject.toJson()));
+            ctx.result(JsonConfigHolder.GSON.toJson(updatedProject.toJson()));
             ctx.contentType(ContentType.APPLICATION_JSON);
             ctx.status(200);
 
@@ -456,7 +456,7 @@ public class ProjectEndpoint implements EndpointGroup {
                 throw new InternalServerErrorResponse("Failed to update project");
             }
 
-            ctx.result(ConfigHolder.GSON.toJson(updatedProject.toJson()));
+            ctx.result(JsonConfigHolder.GSON.toJson(updatedProject.toJson()));
             ctx.contentType(ContentType.APPLICATION_JSON);
             ctx.status(200);
 
@@ -540,7 +540,7 @@ public class ProjectEndpoint implements EndpointGroup {
                 throw new InternalServerErrorResponse("Failed to update project");
             }
 
-            ctx.result(ConfigHolder.GSON.toJson(updatedProject.toJson()));
+            ctx.result(JsonConfigHolder.GSON.toJson(updatedProject.toJson()));
             ctx.contentType(ContentType.APPLICATION_JSON);
             ctx.status(200);
 

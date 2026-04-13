@@ -2,7 +2,7 @@ package com.resonance.server.web;
 
 import com.google.gson.JsonObject;
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.utils.EncodingUtils;
 import io.javalin.http.*;
@@ -107,7 +107,7 @@ public class SessionHandler {
 		
 		//decode payload
 		final String payloadJson = EncodingUtils.base64Decode(encodedPayload);
-		final JsonObject payload = ConfigHolder.GSON.fromJson(payloadJson, JsonObject.class);
+		final JsonObject payload = JsonConfigHolder.GSON.fromJson(payloadJson, JsonObject.class);
 		
 		//check if expired
 		if(checkExpiration && payload.get("expiry").getAsLong() < System.currentTimeMillis()) {

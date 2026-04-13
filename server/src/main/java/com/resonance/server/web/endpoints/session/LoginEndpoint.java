@@ -2,7 +2,7 @@ package com.resonance.server.web.endpoints.session;
 
 import com.password4j.Password;
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.UserAccount;
 import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.http.*;
@@ -43,7 +43,7 @@ public class LoginEndpoint implements EndpointGroup {
 		
 		Server.INSTANCE.getWebServer().getSessionHandler().storeSession(account, ctx);
 		
-		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
+		ctx.result(JsonConfigHolder.GSON.toJson(account.toJson(false)));
 		ctx.contentType(ContentType.APPLICATION_JSON);
 		ctx.status(200);
 	}

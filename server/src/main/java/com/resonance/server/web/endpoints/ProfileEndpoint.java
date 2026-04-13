@@ -1,7 +1,7 @@
 package com.resonance.server.web.endpoints;
 
 import com.resonance.server.Server;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.UserAccount;
 import com.resonance.server.data.tags.Tag;
 import io.javalin.apibuilder.EndpointGroup;
@@ -38,7 +38,7 @@ public class ProfileEndpoint implements EndpointGroup {
 
 		if (!ctx.method().equals(HandlerType.POST)) {
 			// GET request - return profile data
-			ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
+			ctx.result(JsonConfigHolder.GSON.toJson(account.toJson(false)));
 			ctx.contentType(ContentType.APPLICATION_JSON);
 			return;
 		}
@@ -94,7 +94,7 @@ public class ProfileEndpoint implements EndpointGroup {
 		Server.INSTANCE.getDatabaseManager().updateAccount(account).block();
 
 		// After update, return the updated profile
-		ctx.result(ConfigHolder.GSON.toJson(account.toJson(false)));
+		ctx.result(JsonConfigHolder.GSON.toJson(account.toJson(false)));
 		ctx.contentType(ContentType.APPLICATION_JSON);
 	}
 }

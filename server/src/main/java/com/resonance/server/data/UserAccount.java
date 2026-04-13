@@ -2,7 +2,7 @@ package com.resonance.server.data;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.JsonConfigHolder;
 import com.resonance.server.data.tags.Genre;
 import com.resonance.server.data.tags.Instrument;
 import com.resonance.server.data.tags.Tag;
@@ -145,7 +145,7 @@ public record UserAccount(
 		}
 
 		public JsonObject toJson() {
-			return ConfigHolder.GSON.toJsonTree(this, UserInfo.class).getAsJsonObject();
+			return JsonConfigHolder.GSON.toJsonTree(this, UserInfo.class).getAsJsonObject();
 		}
 
 		public enum ExperienceLevel implements EnumType {

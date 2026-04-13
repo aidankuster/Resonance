@@ -1,6 +1,6 @@
 package com.resonance.server.database;
 
-import com.resonance.server.config.ConfigHolder;
+import com.resonance.server.config.ConfigProvider;
 import com.resonance.server.data.Project;
 import com.resonance.server.data.Report;
 import com.resonance.server.data.UserAccount;
@@ -35,14 +35,8 @@ public class DatabaseManager implements AutoCloseable {
 	private final Connection connection;
 	private final DSLContext dsl;
 	
-	public DatabaseManager() {
-		final ConfigHolder<DatabaseConfig> configHolder = new ConfigHolder<>("database", DatabaseConfig.class);
-		
-		try {
-			this.config = configHolder.loadConfig();
-		} catch(Exception ex) {
-			throw new RuntimeException("Failed to load database config", ex);
-		}
+	public DatabaseManager(ConfigProvider configProvider) {
+		this.config = configProvider.getDatabaseConfig();
 		
 		final String baseUrl = switch(this.config.dialect) {
 			case SQLITE -> //sqlite is file based rather than network based
@@ -749,5 +743,9 @@ public class DatabaseManager implements AutoCloseable {
 		if(this.connection != null) {
 			this.connection.close();
 		}
+	}
+	
+	public DatabaseConfig getConfig() {
+		return this.config;
 	}
 }
