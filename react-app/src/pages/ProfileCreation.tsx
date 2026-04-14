@@ -1086,40 +1086,67 @@ function ProfileCreation() {
       <div className="container mx-auto px-6 max-w-4xl">
         <div className="flex items-center justify-between mb-12">
           <div className="flex items-center gap-4">
-            {[1, 2, 3, 4].map((s) => {
-              // In edit mode, visually start at step 2 (but keep numbering)
-              const displayStep = isEditingMode && s === 1 ? null : s;
-              if (displayStep === null) return null;
+            {isEditingMode
+              ? // Edit mode: only show steps 2, 3, 4 (relabeled as 1, 2, 3)
+                [2, 3, 4].map((actualStep, index) => {
+                  const displayNumber = index + 1;
+                  const isActive = step >= actualStep;
+                  const isCompleted = step > actualStep;
 
-              const isActive = isEditingMode ? step + 1 >= s : step >= s;
-              const isCompleted = isEditingMode ? step + 1 > s : step > s;
+                  return (
+                    <div key={actualStep} className="flex items-center">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          isActive ? "bg-amber-600" : "bg-gray-800"
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <div className="w-4 h-4 bg-amber-200 rounded-full" />
+                        ) : (
+                          <span className="font-bold">{displayNumber}</span>
+                        )}
+                      </div>
+                      {actualStep < 4 && (
+                        <div
+                          className={`w-12 h-1 mx-2 ${
+                            isCompleted ? "bg-amber-600" : "bg-gray-800"
+                          }`}
+                        />
+                      )}
+                    </div>
+                  );
+                })
+              : // New user mode: show all 4 steps
+                [1, 2, 3, 4].map((s) => {
+                  const isActive = step >= s;
+                  const isCompleted = step > s;
 
-              return (
-                <div key={s} className="flex items-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      isActive ? "bg-amber-600" : "bg-gray-800"
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <div className="w-4 h-4 bg-amber-200 rounded-full" />
-                    ) : (
-                      <span className="font-bold">{s}</span>
-                    )}
-                  </div>
-                  {s < 4 && (
-                    <div
-                      className={`w-12 h-1 mx-2 ${
-                        isCompleted ? "bg-amber-600" : "bg-gray-800"
-                      }`}
-                    />
-                  )}
-                </div>
-              );
-            })}
+                  return (
+                    <div key={s} className="flex items-center">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          isActive ? "bg-amber-600" : "bg-gray-800"
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <div className="w-4 h-4 bg-amber-200 rounded-full" />
+                        ) : (
+                          <span className="font-bold">{s}</span>
+                        )}
+                      </div>
+                      {s < 4 && (
+                        <div
+                          className={`w-12 h-1 mx-2 ${
+                            isCompleted ? "bg-amber-600" : "bg-gray-800"
+                          }`}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
           </div>
           <div className="text-amber-400">
-            Step {isEditingMode ? step + 1 : step} of 4
+            Step {isEditingMode ? step - 1 : step} of {isEditingMode ? 3 : 4}
           </div>
         </div>
 

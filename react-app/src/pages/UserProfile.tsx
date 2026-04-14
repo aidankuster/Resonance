@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
 import {
@@ -17,8 +17,11 @@ import {
   Flag,
   Users,
   Camera,
+  Play,
+  Pause,
 } from "lucide-react";
-import { profileAPI } from "../services/api";
+import { profileAPI, audioAPI } from "../services/api";
+import type { AudioFileResponse } from "../services/api";
 
 interface UserProfileData {
   id: number;
@@ -52,6 +55,12 @@ function UserProfile() {
     null,
   );
 
+  // Audio samples state
+  const [audioFiles, setAudioFiles] = useState<AudioFileResponse[]>([]);
+  const [loadingAudio, setLoadingAudio] = useState(false);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   useEffect(() => {
     const loadProfiles = async () => {
       try {
@@ -68,6 +77,9 @@ function UserProfile() {
           parseInt(id),
         );
         setProfile(profileData);
+
+        // Load audio files for this user
+        await loadAudioFiles(parseInt(id));
 
         // If user is authenticated, also load their own profile for comparison
         if (isAuthenticated && user) {
@@ -93,6 +105,14 @@ function UserProfile() {
     };
 
     loadProfiles();
+
+    // Cleanup audio on unmount
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
   }, [id, isAuthenticated, user]);
 
   useEffect(() => {
@@ -103,6 +123,72 @@ function UserProfile() {
       );
     }
   }, [profile]);
+
+  const loadAudioFiles = async (userId: number) => {
+    setLoadingAudio(true);
+    try {
+      // If viewing own profile, use the authenticated endpoint
+      if (isOwnProfile) {
+        const files = await audioAPI.getUserAudioFiles();
+        setAudioFiles(files);
+      } else {
+        // For public profiles, we need a public endpoint or we can fetch directly
+        // For now, try to fetch using the same endpoint (it may be restricted)
+        try {
+          const files = await audioAPI.getUserAudioFiles();
+          // Filter to only show files belonging to this user
+          // This assumes the API returns files with uploaderId
+          setAudioFiles(files.filter((f: any) => f.uploaderId === userId));
+        } catch {
+          // If not authenticated or endpoint restricted, show empty
+          setAudioFiles([]);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load audio files:", error);
+      setAudioFiles([]);
+    } finally {
+      setLoadingAudio(false);
+    }
+  };
+
+  const handlePlayAudio = (uuid: string) => {
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    // If clicking the same audio that's playing, just stop it
+    if (currentlyPlaying === uuid) {
+      setCurrentlyPlaying(null);
+      return;
+    }
+
+    // Create and play new audio
+    const audioUrl = audioAPI.getAudioFileUrl(uuid);
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+
+    audio.onended = () => {
+      setCurrentlyPlaying(null);
+      audioRef.current = null;
+    };
+
+    audio.onerror = (e) => {
+      console.error("Failed to load audio:", e);
+      setCurrentlyPlaying(null);
+      audioRef.current = null;
+    };
+
+    audio.play().catch((err) => {
+      console.error("Failed to play audio:", err);
+      setCurrentlyPlaying(null);
+      audioRef.current = null;
+    });
+
+    setCurrentlyPlaying(uuid);
+  };
 
   const handleProfilePictureUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -135,6 +221,25 @@ function UserProfile() {
       alert("Failed to upload profile picture. Please try again.");
     } finally {
       setUploadingPicture(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  };
+
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return "Unknown date";
     }
   };
 
@@ -193,9 +298,6 @@ function UserProfile() {
   // Check if this is the current user's own profile
   const isOwnProfile =
     currentUserProfile && profile && currentUserProfile.id === profile.id;
-
-  // No redirects - show profile page for everyone
-  // The Dashboard link is in the navigation, users can click there if they want
 
   if (loading || authLoading) {
     return (
@@ -387,8 +489,10 @@ function UserProfile() {
                   <p className="text-xs text-gray-400">Genres</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-amber-400">0</p>
-                  <p className="text-xs text-gray-400">Projects</p>
+                  <p className="text-2xl font-bold text-amber-400">
+                    {audioFiles.length}
+                  </p>
+                  <p className="text-xs text-gray-400">Audio Samples</p>
                 </div>
               </div>
             </div>
@@ -536,16 +640,85 @@ function UserProfile() {
               </div>
             </div>
 
-            {/* Audio Samples (placeholder) */}
+            {/* Audio Samples */}
             <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                 <Headphones className="h-5 w-5 text-amber-400" />
                 Audio Samples
+                {audioFiles.length > 0 && (
+                  <span className="text-xs bg-amber-600 px-2 py-0.5 rounded-full">
+                    {audioFiles.length}
+                  </span>
+                )}
               </h3>
-              <div className="text-center py-4">
-                <Volume2 className="h-12 w-12 text-gray-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No audio samples yet</p>
-              </div>
+
+              {loadingAudio ? (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-amber-500"></div>
+                </div>
+              ) : audioFiles.length > 0 ? (
+                <div className="space-y-3">
+                  {audioFiles.map((file) => (
+                    <div
+                      key={file.uuid}
+                      className="bg-gray-800/30 rounded-xl p-3 border border-gray-700 hover:border-amber-500/30 transition"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="bg-green-500/20 p-2 rounded-lg flex-shrink-0">
+                            <Volume2 className="h-4 w-4 text-green-400" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="text-sm font-medium truncate"
+                              title={file.fileName}
+                            >
+                              {file.fileName}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {formatDate(file.uploadDate)}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handlePlayAudio(file.uuid)}
+                          className={`ml-3 p-2 rounded-full transition flex-shrink-0 ${
+                            currentlyPlaying === file.uuid
+                              ? "bg-amber-600 text-white"
+                              : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                          }`}
+                          title={
+                            currentlyPlaying === file.uuid ? "Pause" : "Play"
+                          }
+                        >
+                          {currentlyPlaying === file.uuid ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <Volume2 className="h-12 w-12 text-gray-600 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No audio samples yet</p>
+                  {isOwnProfile && (
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/create-profile?edit=true&userId=${profile.id}`,
+                        )
+                      }
+                      className="mt-3 text-xs text-amber-400 hover:text-amber-300 transition"
+                    >
+                      Add audio samples to your profile
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Similar Musicians (placeholder) */}

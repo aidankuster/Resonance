@@ -13,8 +13,6 @@ import {
   FileText,
   Plus,
   Filter,
-  Eye,
-  Heart,
   Volume2,
   ChevronRight,
   Settings,
@@ -25,6 +23,7 @@ import {
   TrendingUp,
   FolderOpen,
   Shield,
+  Award,
 } from "lucide-react";
 
 // Define the expected response type from backend
@@ -67,9 +66,9 @@ function Dashboard() {
     name: "",
     instrument: "",
     completion: 0,
-    profileViews: 0,
-    matches: 0,
     email: "",
+    experienceLevel: "",
+    genres: [] as string[],
   });
 
   // Real data states
@@ -88,7 +87,6 @@ function Dashboard() {
   const [platformStats, setPlatformStats] = useState({
     activeMusicians: 0,
     activeProjects: 0,
-    newThisWeek: 0,
   });
 
   // Handle search submission
@@ -134,9 +132,9 @@ function Dashboard() {
               ? profileData.instruments.join(", ")
               : "No instruments",
           completion: completion,
-          profileViews: 0,
-          matches: 0,
           email: profileData.emailAddress,
+          experienceLevel: profileData.info.experienceLevel || "BEGINNER",
+          genres: profileData.genres || [],
         });
 
         // Fetch discoverable musicians after user profile loads
@@ -185,14 +183,9 @@ function Dashboard() {
         totalProjects = projects.length;
       }
 
-      // Calculate new this week (users created in last 7 days)
-      // For now, we'll estimate based on total - you can enhance this later
-      const newThisWeek = Math.floor(totalMusicians * 0.15); // ~15% of total as placeholder
-
       setPlatformStats({
         activeMusicians: totalMusicians,
         activeProjects: totalProjects,
-        newThisWeek: newThisWeek,
       });
 
       console.log(
@@ -215,7 +208,6 @@ function Dashboard() {
       console.log("🔍 Fetching discoverable musicians...");
 
       // Search for users with matching instruments or genres
-      // We'll try to find users that share at least one instrument or genre
       let allUsers: SearchResultUser[] = [];
 
       // Try searching with the user's primary instrument first
@@ -278,12 +270,9 @@ function Dashboard() {
     try {
       console.log("🔍 Fetching projects for user ID:", userId);
 
-      const response = await fetch(
-        `/api/projects?founderId=${userId}`,
-        {
-          credentials: "include",
-        },
-      );
+      const response = await fetch(`/api/projects?founderId=${userId}`, {
+        credentials: "include",
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch projects: ${response.status}`);
@@ -303,11 +292,9 @@ function Dashboard() {
   const handleLogout = async () => {
     try {
       await authAPI.logout();
-      // Force a hard navigation to clear any cached state
       window.location.href = "/";
     } catch (error) {
       console.error("Logout failed:", error);
-      // Fallback - still try to navigate
       window.location.href = "/";
     }
   };
@@ -323,17 +310,37 @@ function Dashboard() {
     // TODO: Implement flyer generation
   };
 
-  // Helper function to get match percentage based on shared instruments/genres
+  const handleManageAudio = () => {
+    if (user?.id) {
+      navigate(`/create-profile?edit=true&userId=${user.id}#step4`);
+    }
+  };
+
+  const handleCopyProfileLink = () => {
+    if (user?.id) {
+      const profileLink = `http://localhost/profile/${user.id}`;
+      navigator.clipboard
+        .writeText(profileLink)
+        .then(() => {
+          alert("Profile link copied to clipboard!");
+        })
+        .catch(() => {
+          alert("Failed to copy link. Here it is: " + profileLink);
+        });
+    }
+  };
+
+  const formatExperienceLevel = (level: string) => {
+    if (!level) return "Beginner";
+    return level.charAt(0) + level.slice(1).toLowerCase();
+  };
+
+  // Helper function to get match percentage
   const calculateMatchPercentage = (musician: SearchResultUser): number => {
-    // This is a simple calculation - you can make it more sophisticated
-    // For now, use the matchPercentage from the API if available
     if (musician.matchPercentage !== undefined) {
       return musician.matchPercentage;
     }
-
-    // Fallback: calculate based on available data
-    // You could enhance this by comparing with the current user's instruments/genres
-    return Math.floor(Math.random() * 20) + 75; // 75-95% range as placeholder
+    return Math.floor(Math.random() * 20) + 75;
   };
 
   // Helper to get status color for project cards
@@ -408,11 +415,12 @@ function Dashboard() {
                       alt={userProfile.name}
                       className="h-full w-full object-cover"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.style.display = "none";
                         const parent = e.currentTarget.parentElement;
                         if (parent) {
-                          const icon = document.createElement('div');
-                          icon.innerHTML = '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                          const icon = document.createElement("div");
+                          icon.innerHTML =
+                            '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
                           parent.appendChild(icon.firstChild!);
                         }
                       }}
@@ -441,11 +449,12 @@ function Dashboard() {
                         alt={userProfile.name}
                         className="h-full w-full object-cover"
                         onError={(e) => {
-                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.style.display = "none";
                           const parent = e.currentTarget.parentElement;
                           if (parent) {
-                            const icon = document.createElement('div');
-                            icon.innerHTML = '<svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                            const icon = document.createElement("div");
+                            icon.innerHTML =
+                              '<svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
                             parent.appendChild(icon.firstChild!);
                           }
                         }}
@@ -463,7 +472,7 @@ function Dashboard() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <div>
                     <div className="flex justify-between text-sm mb-1">
                       <span>Profile Completion</span>
@@ -477,20 +486,38 @@ function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div className="bg-gray-800/50 p-3 rounded-xl">
-                      <p className="text-2xl font-bold">
-                        {userProfile.profileViews}
-                      </p>
-                      <p className="text-xs text-gray-400">Profile Views</p>
+                  {/* Experience Level */}
+                  <div className="bg-gray-800/50 p-3 rounded-xl">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Award className="h-4 w-4 text-amber-400" />
+                      <p className="text-xs text-gray-400">Experience Level</p>
                     </div>
-                    <div className="bg-gray-800/50 p-3 rounded-xl">
-                      <p className="text-2xl font-bold">
-                        {userProfile.matches}
-                      </p>
-                      <p className="text-xs text-gray-400">Matches</p>
-                    </div>
+                    <p className="font-medium text-amber-300">
+                      {formatExperienceLevel(userProfile.experienceLevel)}
+                    </p>
                   </div>
+
+                  {/* Genres */}
+                  {userProfile.genres.length > 0 && (
+                    <div className="bg-gray-800/50 p-3 rounded-xl">
+                      <p className="text-xs text-gray-400 mb-2">Genres</p>
+                      <div className="flex flex-wrap gap-1">
+                        {userProfile.genres.slice(0, 3).map((genre, idx) => (
+                          <span
+                            key={idx}
+                            className="bg-amber-500/10 text-amber-300 px-2 py-1 rounded-full text-xs"
+                          >
+                            {genre}
+                          </span>
+                        ))}
+                        {userProfile.genres.length > 3 && (
+                          <span className="text-gray-400 text-xs">
+                            +{userProfile.genres.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -587,13 +614,13 @@ function Dashboard() {
                     Welcome back, {userProfile.name}!
                   </h1>
                   <p className="text-gray-300">
-                    Ready to make some music? Check out your matches and latest
-                    activity.
+                    Ready to make some music? Check out your matches or create
+                    your own project.
                   </p>
                 </div>
                 <button
                   onClick={() => navigate("/create-project")}
-                  className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition transform hover:scale-105"
+                  className="bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition transform hover:scale-105"
                 >
                   <Plus className="h-5 w-5" />
                   New Project
@@ -639,15 +666,20 @@ function Dashboard() {
                             <div className="flex items-center space-x-3">
                               <div className="h-12 w-12 bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-full flex items-center justify-center overflow-hidden">
                                 <img
-                                  src={profileAPI.getProfilePictureUrl(musician.id)}
+                                  src={profileAPI.getProfilePictureUrl(
+                                    musician.id,
+                                  )}
                                   alt={musician.displayName}
                                   className="h-full w-full object-cover"
                                   onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    const parent = e.currentTarget.parentElement;
+                                    e.currentTarget.style.display = "none";
+                                    const parent =
+                                      e.currentTarget.parentElement;
                                     if (parent) {
-                                      const icon = document.createElement('div');
-                                      icon.innerHTML = '<svg class="h-6 w-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                                      const icon =
+                                        document.createElement("div");
+                                      icon.innerHTML =
+                                        '<svg class="h-6 w-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
                                       parent.appendChild(icon.firstChild!);
                                     }
                                   }}
@@ -696,36 +728,8 @@ function Dashboard() {
                               {musician.experienceLevel?.toLowerCase() ||
                                 "beginner"}
                             </span>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/profile/${musician.id}`);
-                                }}
-                                className="p-2 hover:bg-gray-800 rounded-full transition"
-                              >
-                                <Eye className="h-5 w-5" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // TODO: Implement save functionality
-                                  console.log("Save musician:", musician.id);
-                                }}
-                                className="p-2 hover:bg-gray-800 rounded-full transition"
-                              >
-                                <Heart className="h-5 w-5" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/profile/${musician.id}`);
-                                }}
-                                className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-full text-sm font-medium transition"
-                              >
-                                Contact
-                              </button>
-                            </div>
+                            {/* Removed eye, heart, and contact buttons */}
+                            <div></div>
                           </div>
                         </div>
                       );
@@ -795,7 +799,10 @@ function Dashboard() {
                     <p className="text-gray-400 text-sm mb-4">
                       Upload and manage your audio samples
                     </p>
-                    <button className="w-full bg-gray-800 hover:bg-gray-700 py-2 rounded-full font-medium transition">
+                    <button
+                      onClick={handleManageAudio}
+                      className="w-full bg-gray-800 hover:bg-gray-700 py-2 rounded-full font-medium transition"
+                    >
                       Manage Audio
                     </button>
                   </div>
@@ -807,7 +814,6 @@ function Dashboard() {
               <div className="space-y-8">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">My Projects</h2>
-                  {/* Removed duplicate New Project button - now only in Welcome banner */}
                 </div>
 
                 {loadingProjects ? (
@@ -915,7 +921,7 @@ function Dashboard() {
                     </p>
                     <button
                       onClick={handleGenerateFlyer}
-                      className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 py-3 rounded-full font-semibold transition"
+                      className="w-full bg-amber-600 hover:bg-amber-700 py-3 rounded-full font-semibold transition"
                     >
                       Generate PDF Flyer
                     </button>
@@ -932,7 +938,10 @@ function Dashboard() {
                       Share your profile link with other musicians or on social
                       media.
                     </p>
-                    <button className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-full font-medium transition">
+                    <button
+                      onClick={handleCopyProfileLink}
+                      className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-full font-medium transition"
+                    >
                       Copy Profile Link
                     </button>
                   </div>
@@ -1003,12 +1012,6 @@ function Dashboard() {
                       {platformStats.activeProjects}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">New This Week</span>
-                    <span className="font-bold">
-                      {platformStats.newThisWeek}
-                    </span>
-                  </div>
                 </div>
               </div>
 
@@ -1018,9 +1021,11 @@ function Dashboard() {
                   Contact the UNCP Music Department for support or questions
                   about the platform.
                 </p>
-                <button className="w-full bg-amber-600 hover:bg-amber-700 py-2 rounded-full font-medium transition">
-                  Get Support
-                </button>
+                <a href="mailto:music@uncp.edu">
+                  <button className="w-full bg-amber-600 hover:bg-amber-700 py-2 rounded-full font-medium transition">
+                    Get Support
+                  </button>
+                </a>
               </div>
             </div>
           </aside>
