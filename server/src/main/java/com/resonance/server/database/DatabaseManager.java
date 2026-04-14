@@ -322,12 +322,14 @@ public class DatabaseManager implements AutoCloseable {
 						field("name"),
 						field("founder_id"),
 						field("description"),
-						field("status"))
+						field("status"),
+						field("creation_date"))
 				.values(
 						DSL.inline(name, String.class),
 						DSL.inline(founderID, int.class),
 						DSL.inline(description, String.class),
-						DSL.inline(status, String.class)))
+						DSL.inline(status, String.class),
+						DSL.inline(new Date(System.currentTimeMillis()), Date.class)))
 				.flatMap((i) -> {
 					if (i <= 0) {
 						return Mono.error(new Exception("Failed to create project"));
@@ -767,7 +769,7 @@ public class DatabaseManager implements AutoCloseable {
 					.column("founder_id", SQLDataType.INTEGER)
 					.column("description", SQLDataType.VARCHAR(255))
 					.column("status", SQLDataType.VARCHAR(20))
-					.column("creation_date", SQLDataType.DATE.defaultValue(currentDate()))
+					.column("creation_date", SQLDataType.DATE)
 					.constraints(
 							primaryKey("project_id"),
 							constraint("fk_founder_account_id")
