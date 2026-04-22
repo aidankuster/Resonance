@@ -125,7 +125,7 @@ public class SessionHandler {
 				token,
 				"/",
 				(int) this.defaultExpiryDuration / 1000, //convert to seconds
-				true,
+				false,
 				0,
 				true,
 				null,
