@@ -318,7 +318,7 @@ function Dashboard() {
 
   const handleCopyProfileLink = () => {
     if (user?.id) {
-      const profileLink = `http://localhost/profile/${user.id}`;
+      const profileLink = `/profile/${user.id}`;
       navigator.clipboard
         .writeText(profileLink)
         .then(() => {

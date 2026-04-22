@@ -103,7 +103,7 @@ function AdminDashboard() {
       console.log("Fetching users from admin endpoint...");
 
       // Fetch all users
-      const usersResponse = await fetch("http://localhost:80/api/admin/users", {
+      const usersResponse = await fetch("/api/admin/users", {
         credentials: "include",
       });
 
@@ -127,7 +127,7 @@ function AdminDashboard() {
 
       // Fetch all projects for stats
       console.log("Fetching projects...");
-      const projectsResponse = await fetch("http://localhost:80/api/projects", {
+      const projectsResponse = await fetch("/api/projects", {
         credentials: "include",
       });
 
@@ -162,7 +162,7 @@ function AdminDashboard() {
     try {
       console.log("Fetching projects for user:", userId);
       const response = await fetch(
-        `http://localhost:80/api/projects?founderId=${userId}`,
+        `/api/projects?founderId=${userId}`,
         {
           credentials: "include",
         },
@@ -241,7 +241,7 @@ function AdminDashboard() {
     setIsDeleting(true);
     try {
       const response = await fetch(
-        `http://localhost:80/api/admin/users/${userToDelete.id}`,
+        `/api/admin/users/${userToDelete.id}`,
         {
           method: "DELETE",
           credentials: "include",
@@ -285,7 +285,7 @@ function AdminDashboard() {
   const handleToggleUserStatus = async (user: UserData) => {
     try {
       const response = await fetch(
-        `http://localhost:80/api/admin/users/${user.id}/toggle`,
+        `/api/admin/users/${user.id}/toggle`,
         {
           method: "POST",
           credentials: "include",

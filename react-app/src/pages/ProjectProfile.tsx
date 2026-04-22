@@ -136,7 +136,7 @@ function ProjectProfile() {
       setLoadingApplications(true);
       try {
         const response = await fetch(
-          `http://localhost:80/api/projects/${id}/applications`,
+          `/api/projects/${id}/applications`,
           { credentials: "include" },
         );
         if (response.ok) {
@@ -160,7 +160,7 @@ function ProjectProfile() {
 
       try {
         const response = await fetch(
-          `http://localhost:80/api/applications?userId=${currentUserId}`,
+          `/api/applications?userId=${currentUserId}`,
           { credentials: "include" },
         );
         if (response.ok) {
@@ -303,7 +303,7 @@ function ProjectProfile() {
       formData.append("roleName", selectedRole);
       formData.append("message", applicationMessage);
 
-      const response = await fetch("http://localhost:80/api/applications", {
+      const response = await fetch("/api/applications", {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -339,7 +339,7 @@ function ProjectProfile() {
   const handleAcceptApplication = async (applicationId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:80/api/applications/${applicationId}/accept`,
+        `/api/applications/${applicationId}/accept`,
         {
           method: "POST",
           credentials: "include",
@@ -366,7 +366,7 @@ function ProjectProfile() {
   const handleRejectApplication = async (applicationId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:80/api/applications/${applicationId}/reject`,
+        `/api/applications/${applicationId}/reject`,
         {
           method: "POST",
           credentials: "include",
