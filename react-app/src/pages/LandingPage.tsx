@@ -153,7 +153,15 @@ function App() {
         {/* Hero Section */}
         <section className="container mx-auto px-6 py-20 text-center">
           <h1 className="text-5xl md:text-7xl font-bold mb-6">
-            Welcome to <span className="text-amber-400">Resonance</span>
+            Welcome to{" "}
+            <span className="text-amber-400 inline-flex items-center">
+              Resonance
+              <span className="audio-waves-container">
+                <span className="audio-arc"></span>
+                <span className="audio-arc"></span>
+                <span className="audio-arc"></span>
+              </span>
+            </span>
           </h1>
           <p className="text-xl text-gray-300 mb-10 max-w-3xl mx-auto">
             Connect with UNCP music students to form ensembles, collaborate on

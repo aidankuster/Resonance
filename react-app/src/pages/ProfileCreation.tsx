@@ -306,7 +306,6 @@ function ProfileCreation() {
       return;
     }
 
-    // Validate file types and sizes
     for (const file of files) {
       if (!file.type.startsWith("audio/")) {
         alert(`${file.name} is not an audio file`);
@@ -366,7 +365,6 @@ function ProfileCreation() {
     setStep(step - 1);
   };
 
-  // Step 1 submission - Register account
   const handleRegister = async () => {
     setIsSubmitting(true);
     try {
@@ -375,11 +373,8 @@ function ProfileCreation() {
         accountData.password,
         accountData.confirmPassword,
       );
-
       console.log("Account created successfully:", response);
       setUserId(response.id);
-
-      // Move to next step
       setStep(step + 1);
     } catch (error: any) {
       console.error("Error creating account:", error);
@@ -392,7 +387,6 @@ function ProfileCreation() {
     }
   };
 
-  // Step 4 submission - Update profile with all details
   const handleUpdateProfile = async () => {
     const targetUserId = isEditingMode ? parseInt(editUserId!) : userId;
 
@@ -405,40 +399,27 @@ function ProfileCreation() {
     setIsSubmitting(true);
 
     try {
-      // Create FormData for profile update
       const formData = new FormData();
-
-      // Add profile fields as form parameters
       formData.append("display_name", profileData.displayName);
       formData.append("bio", profileData.bio || "");
       formData.append("availability", profileData.availability || "");
-
-      // Convert experience level to backend enum format (uppercase)
-      const backendExperienceLevel = profileData.experienceLevel.toUpperCase();
-      formData.append("experience_level", backendExperienceLevel);
-
-      // Add tags (instruments and genres combined)
+      formData.append(
+        "experience_level",
+        profileData.experienceLevel.toUpperCase(),
+      );
       [...profileData.instruments, ...profileData.genres].forEach((tag) => {
         formData.append("tag", tag);
       });
-
-      // Add audio samples
       profileData.audioSamples.forEach((file) => {
         formData.append("audioSamples", file);
       });
 
-      // Send profile data to backend using profileAPI
       const response = await profileAPI.updateProfile(targetUserId, formData);
-
       console.log("Profile updated successfully:", response);
 
-      // If this is a new user registration (not edit mode), auto-login
       if (!isEditingMode) {
         try {
-          const loginResponse = await login(
-            accountData.email,
-            accountData.password,
-          );
+          await login(accountData.email, accountData.password);
           console.log("Auto-login successful");
         } catch (loginError) {
           console.warn(
@@ -448,22 +429,18 @@ function ProfileCreation() {
         }
       }
 
-      // Upload profile picture separately if exists (after login for new users)
       if (profileData.profilePicture) {
         try {
           await profileAPI.uploadProfilePicture(profileData.profilePicture);
           console.log("Profile picture uploaded successfully");
         } catch (picError: any) {
           console.error("Failed to upload profile picture:", picError);
-          console.error("Error details:", picError.message);
-          // Don't fail the whole operation if just the picture fails
           alert(
             `Profile saved, but profile picture upload failed: ${picError.message}. You can try uploading it again from your profile.`,
           );
         }
       }
 
-      // Delete marked audio files
       for (const uuid of audioFilesToDelete) {
         try {
           await audioAPI.deleteAudioFile(uuid);
@@ -473,7 +450,6 @@ function ProfileCreation() {
         }
       }
 
-      // Upload new audio files
       for (const audioFile of profileData.audioSamples) {
         try {
           await audioAPI.uploadAudioFile(audioFile);
@@ -487,7 +463,6 @@ function ProfileCreation() {
         }
       }
 
-      // Navigate to profile page after save
       navigate(`/profile/${targetUserId}`);
     } catch (error: any) {
       console.error("Error updating profile:", error);
@@ -549,509 +524,570 @@ function ProfileCreation() {
       case 1:
         if (isEditingMode) return null;
         return (
-          <div className="space-y-8">
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  UNCP Email *
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type="email"
-                    value={accountData.email}
-                    onChange={(e) =>
-                      handleAccountChange("email", e.target.value)
-                    }
-                    onKeyDown={handleKeyDown}
-                    className={`w-full bg-gray-900 border rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-amber-500 ${
-                      formErrors.email ? "border-red-500" : "border-gray-700"
-                    }`}
-                    placeholder="your.name@bravemail.uncp.edu"
-                    required
-                  />
-                </div>
-                {formErrors.email ? (
-                  <p className="text-sm text-red-400 mt-1">
-                    {formErrors.email}
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Must use your UNCP @bravemail.uncp.edu or @uncp.edu email
-                  </p>
-                )}
+          <div>
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                UNCP Email *
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <input
+                  type="email"
+                  value={accountData.email}
+                  onChange={(e) => handleAccountChange("email", e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className={`w-full bg-gray-900 border rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-amber-500 ${formErrors.email ? "border-red-500" : "border-gray-700"}`}
+                  placeholder="your.name@bravemail.uncp.edu"
+                  required
+                />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Password *
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={accountData.password}
-                    onChange={(e) =>
-                      handleAccountChange("password", e.target.value)
-                    }
-                    onKeyDown={handleKeyDown}
-                    className={`w-full bg-gray-900 border rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-amber-500 ${
-                      formErrors.password ? "border-red-500" : "border-gray-700"
-                    }`}
-                    placeholder="Create a strong password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-                {formErrors.password && (
-                  <p className="text-sm text-red-400 mt-1">
-                    {formErrors.password}
-                  </p>
-                )}
+              {formErrors.email ? (
+                <p className="text-sm text-red-400 mt-1">{formErrors.email}</p>
+              ) : (
                 <p className="text-sm text-gray-500 mt-1">
-                  Must be at least 8 characters with uppercase, lowercase, and a
-                  number
+                  Must use your UNCP @bravemail.uncp.edu or @uncp.edu email
                 </p>
-              </div>
+              )}
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Confirm Password *
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={accountData.confirmPassword}
-                    onChange={(e) =>
-                      handleAccountChange("confirmPassword", e.target.value)
-                    }
-                    onKeyDown={handleKeyDown}
-                    className={`w-full bg-gray-900 border rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-amber-500 ${
-                      formErrors.confirmPassword
-                        ? "border-red-500"
-                        : "border-gray-700"
-                    }`}
-                    placeholder="Re-enter your password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-                {formErrors.confirmPassword && (
-                  <p className="text-sm text-red-400 mt-1">
-                    {formErrors.confirmPassword}
-                  </p>
-                )}
+            <div className="mt-5">
+              <label className="block text-sm font-medium mb-2">
+                Password *
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={accountData.password}
+                  onChange={(e) =>
+                    handleAccountChange("password", e.target.value)
+                  }
+                  onKeyDown={handleKeyDown}
+                  className={`w-full bg-gray-900 border rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-amber-500 ${formErrors.password ? "border-red-500" : "border-gray-700"}`}
+                  placeholder="Create a strong password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
+              {formErrors.password && (
+                <p className="text-sm text-red-400 mt-1">
+                  {formErrors.password}
+                </p>
+              )}
+              <p className="text-sm text-gray-500 mt-1">
+                Must be at least 8 characters with uppercase, lowercase, and a
+                number
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <label className="block text-sm font-medium mb-2">
+                Confirm Password *
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={accountData.confirmPassword}
+                  onChange={(e) =>
+                    handleAccountChange("confirmPassword", e.target.value)
+                  }
+                  onKeyDown={handleKeyDown}
+                  className={`w-full bg-gray-900 border rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-amber-500 ${formErrors.confirmPassword ? "border-red-500" : "border-gray-700"}`}
+                  placeholder="Re-enter your password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              {formErrors.confirmPassword && (
+                <p className="text-sm text-red-400 mt-1">
+                  {formErrors.confirmPassword}
+                </p>
+              )}
             </div>
           </div>
         );
 
       case 2:
         return (
-          <div className="space-y-8">
+          <div>
+            <h3 className="text-xl font-bold mb-4">
+              Display Name and Instruments
+            </h3>
+            <p className="text-gray-400 mb-6">
+              Set your display name and select all instruments that you play
+            </p>
+
             <div>
-              <h3 className="text-2xl font-bold mb-2">
-                Display Name and Instruments
-              </h3>
-              <p className="text-gray-400">
-                Set your display name and select all instruments that you play
-              </p>
+              <label className="block text-sm font-medium mb-2">
+                Display Name *
+              </label>
+              <input
+                type="text"
+                value={profileData.displayName}
+                onChange={(e) =>
+                  handleProfileChange("displayName", e.target.value)
+                }
+                onKeyDown={handleKeyDown}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500"
+                placeholder="How other musicians will see you"
+                required
+              />
             </div>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Display Name *
-                </label>
-                <input
-                  type="text"
-                  value={profileData.displayName}
-                  onChange={(e) =>
-                    handleProfileChange("displayName", e.target.value)
-                  }
-                  onKeyDown={handleKeyDown}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500"
-                  placeholder="How other musicians will see you"
-                  required
-                />
+            <div className="mt-5">
+              <label className="block text-sm font-medium mb-2">
+                Instruments You Play *
+              </label>
+              <p className="text-sm text-gray-500 mb-3">
+                Select all that apply (at least one required)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {availableInstruments.map((instr) => (
+                  <button
+                    key={instr}
+                    type="button"
+                    onClick={() => {
+                      const updated = profileData.instruments.includes(instr)
+                        ? profileData.instruments.filter((i) => i !== instr)
+                        : [...profileData.instruments, instr];
+                      handleProfileChange("instruments", updated);
+                    }}
+                    className={`px-4 py-2 rounded-full transition ${profileData.instruments.includes(instr) ? "bg-amber-600 text-white" : "bg-gray-800 hover:bg-gray-700"}`}
+                  >
+                    {instr}
+                  </button>
+                ))}
               </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Instruments You Play *
-                </label>
-                <p className="text-sm text-gray-500 mb-3">
-                  Select all that apply (at least one required)
+              {formErrors.instruments && (
+                <p className="text-sm text-red-400 mt-2">
+                  {formErrors.instruments}
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {availableInstruments.map((instr) => (
-                    <button
-                      key={instr}
-                      type="button"
-                      onClick={() => {
-                        const updated = profileData.instruments.includes(instr)
-                          ? profileData.instruments.filter((i) => i !== instr)
-                          : [...profileData.instruments, instr];
-                        handleProfileChange("instruments", updated);
-                      }}
-                      className={`px-4 py-2 rounded-full transition ${
-                        profileData.instruments.includes(instr)
-                          ? "bg-amber-600 text-white"
-                          : "bg-gray-800 hover:bg-gray-700"
-                      }`}
-                    >
-                      {instr}
-                    </button>
-                  ))}
-                </div>
-                {formErrors.instruments && (
-                  <p className="text-sm text-red-400 mt-2">
-                    {formErrors.instruments}
-                  </p>
-                )}
-              </div>
+              )}
             </div>
           </div>
         );
 
       case 3:
         return (
-          <div className="space-y-8">
+          <div>
+            <h3 className="text-xl font-bold mb-4">Musical Identity</h3>
+            <p className="text-gray-400 mb-6">
+              Tell us about your musical style
+            </p>
+
             <div>
-              <h3 className="text-2xl font-bold mb-2">Musical Identity</h3>
-              <p className="text-gray-400">Tell us about your musical style</p>
+              <label className="block text-sm font-medium mb-2">
+                Favorite Genres *
+              </label>
+              <p className="text-sm text-gray-500 mb-3">
+                Select at least 1 genre that defines your style (up to 5)
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {availableGenres.map((genre) => (
+                  <button
+                    key={genre}
+                    type="button"
+                    onClick={() => {
+                      const updated = profileData.genres.includes(genre)
+                        ? profileData.genres.filter((g) => g !== genre)
+                        : profileData.genres.length < 5
+                          ? [...profileData.genres, genre]
+                          : profileData.genres;
+                      handleProfileChange("genres", updated);
+                    }}
+                    className={`p-3 rounded-xl border-2 transition-all text-sm ${profileData.genres.includes(genre) ? "border-amber-500 bg-amber-500/10" : "border-gray-700 hover:border-gray-500"}`}
+                  >
+                    <span className="font-medium">{genre}</span>
+                  </button>
+                ))}
+              </div>
+              {formErrors.genres && (
+                <p className="text-sm text-red-400 mt-2">{formErrors.genres}</p>
+              )}
             </div>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Favorite Genres *
-                </label>
-                <p className="text-sm text-gray-500 mb-3">
-                  Select at least 1 genre that defines your style (up to 5)
+            <div className="mt-5">
+              <label className="block text-sm font-medium mb-2">
+                Experience Level *
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {experienceLevels.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() =>
+                      handleProfileChange("experienceLevel", level)
+                    }
+                    className={`p-3 rounded-xl border-2 transition-all text-sm ${profileData.experienceLevel === level ? "border-amber-500 bg-amber-500/10" : "border-gray-700 hover:border-gray-500"}`}
+                  >
+                    <span className="font-medium">{level}</span>
+                  </button>
+                ))}
+              </div>
+              {formErrors.experienceLevel && (
+                <p className="text-sm text-red-400 mt-2">
+                  {formErrors.experienceLevel}
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {availableGenres.map((genre) => (
-                    <button
-                      key={genre}
-                      type="button"
-                      onClick={() => {
-                        const updated = profileData.genres.includes(genre)
-                          ? profileData.genres.filter((g) => g !== genre)
-                          : profileData.genres.length < 5
-                            ? [...profileData.genres, genre]
-                            : profileData.genres;
-                        handleProfileChange("genres", updated);
-                      }}
-                      className={`p-4 rounded-xl border-2 transition-all ${
-                        profileData.genres.includes(genre)
-                          ? "border-amber-500 bg-amber-500/10"
-                          : "border-gray-700 hover:border-gray-500"
-                      }`}
-                    >
-                      <span className="font-medium">{genre}</span>
-                    </button>
-                  ))}
-                </div>
-                {formErrors.genres && (
-                  <p className="text-sm text-red-400 mt-2">
-                    {formErrors.genres}
-                  </p>
-                )}
-              </div>
+              )}
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Experience Level *
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {experienceLevels.map((level) => (
-                    <button
-                      key={level}
-                      type="button"
-                      onClick={() =>
-                        handleProfileChange("experienceLevel", level)
-                      }
-                      className={`p-4 rounded-xl border-2 transition-all ${
-                        profileData.experienceLevel === level
-                          ? "border-amber-500 bg-amber-500/10"
-                          : "border-gray-700 hover:border-gray-500"
-                      }`}
-                    >
-                      <span className="font-medium">{level}</span>
-                    </button>
-                  ))}
-                </div>
-                {formErrors.experienceLevel && (
-                  <p className="text-sm text-red-400 mt-2">
-                    {formErrors.experienceLevel}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Musical Bio
-                </label>
-                <textarea
-                  value={profileData.bio}
-                  onChange={(e) => handleProfileChange("bio", e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 h-32 focus:outline-none focus:border-amber-500"
-                  placeholder="Tell us about your musical journey, influences, and what you're looking for..."
-                  maxLength={255}
-                />
-                <p className="text-sm text-gray-500 mt-2 text-right">
-                  {profileData.bio.length}/255
-                </p>
-              </div>
+            <div className="mt-5">
+              <label className="block text-sm font-medium mb-2">
+                Musical Bio
+              </label>
+              <textarea
+                value={profileData.bio}
+                onChange={(e) => handleProfileChange("bio", e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 h-32 focus:outline-none focus:border-amber-500 resize-none"
+                placeholder="Tell us about your musical journey, influences, and what you're looking for..."
+                maxLength={255}
+              />
+              <p className="text-sm text-gray-500 mt-2 text-right">
+                {profileData.bio.length}/255
+              </p>
             </div>
           </div>
         );
 
       case 4:
         return (
-          <div className="space-y-8">
-            <div>
-              <h3 className="text-2xl font-bold mb-2">Showcase Your Talent</h3>
-              <p className="text-gray-400">
-                Add a profile picture and audio samples (optional but
-                recommended)
-              </p>
-            </div>
+          <div>
+            <h3 className="text-xl font-bold mb-4">Showcase Your Talent</h3>
+            <p className="text-gray-400 mb-6">
+              Add a profile picture and audio samples (optional but recommended)
+            </p>
 
-            <div className="space-y-6">
-              {/* Profile Picture Section */}
-              <div>
-                <label className="block text-sm font-medium mb-3">
-                  Profile Picture
-                </label>
-                <div className="flex items-center gap-6">
-                  <div className="relative">
-                    <div className="h-24 w-24 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-500/20 border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden">
-                      {profileData.profilePicture ? (
-                        <img
-                          src={URL.createObjectURL(profileData.profilePicture)}
-                          alt="Profile preview"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : existingProfilePictureUrl ? (
-                        <img
-                          src={existingProfilePictureUrl}
-                          alt="Current profile"
-                          className="h-full w-full object-cover"
-                          onError={() => setExistingProfilePictureUrl(null)}
-                        />
-                      ) : (
-                        <User className="h-10 w-10 text-gray-400" />
-                      )}
-                    </div>
+            {/* Profile Picture */}
+            <div>
+              <label className="block text-sm font-medium mb-3">
+                Profile Picture
+              </label>
+              <div className="flex items-center gap-6">
+                <div className="relative">
+                  <div className="h-24 w-24 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-500/20 border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden">
+                    {profileData.profilePicture ? (
+                      <img
+                        src={URL.createObjectURL(profileData.profilePicture)}
+                        alt="Profile preview"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : existingProfilePictureUrl ? (
+                      <img
+                        src={existingProfilePictureUrl}
+                        alt="Current profile"
+                        className="h-full w-full object-cover"
+                        onError={() => setExistingProfilePictureUrl(null)}
+                      />
+                    ) : (
+                      <User className="h-10 w-10 text-gray-400" />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      document.getElementById("profile-picture")?.click()
+                    }
+                    className="absolute -bottom-2 -right-2 bg-amber-600 hover:bg-amber-700 rounded-full p-2 transition"
+                  >
+                    <Upload className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-300 mb-1">
+                    {existingProfilePictureUrl && !profileData.profilePicture
+                      ? "Change profile photo"
+                      : "Upload a profile photo"}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    JPG, PNG, or GIF • Max 5MB
+                  </p>
+                  <input
+                    type="file"
+                    id="profile-picture"
+                    accept="image/*"
+                    onChange={handleProfilePictureUpload}
+                    className="hidden"
+                  />
+                  {profileData.profilePicture && (
                     <button
                       type="button"
                       onClick={() =>
-                        document.getElementById("profile-picture")?.click()
+                        setProfileData((prev) => ({
+                          ...prev,
+                          profilePicture: null,
+                        }))
                       }
-                      className="absolute -bottom-2 -right-2 bg-amber-600 hover:bg-amber-700 rounded-full p-2 transition"
+                      className="text-xs text-red-400 hover:text-red-300 mt-2"
                     >
-                      <Upload className="h-4 w-4" />
+                      Remove new photo
                     </button>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-300 mb-1">
-                      {existingProfilePictureUrl && !profileData.profilePicture
-                        ? "Change profile photo"
-                        : "Upload a profile photo"}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      JPG, PNG, or GIF • Max 5MB • Square image recommended
-                    </p>
-                    <input
-                      type="file"
-                      id="profile-picture"
-                      accept="image/*"
-                      onChange={handleProfilePictureUpload}
-                      className="hidden"
-                    />
-                    {profileData.profilePicture && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setProfileData((prev) => ({
-                            ...prev,
-                            profilePicture: null,
-                          }))
-                        }
-                        className="text-xs text-red-400 hover:text-red-300 mt-2"
-                      >
-                        Remove new photo
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Audio Samples Section */}
-              <div>
-                <h4 className="font-semibold mb-3">
-                  Audio Samples (
-                  {existingAudioFiles.length + profileData.audioSamples.length}
-                  /3)
-                </h4>
+            {/* Audio Samples */}
+            <div className="mt-6">
+              <h4 className="font-semibold mb-3">
+                Audio Samples (
+                {existingAudioFiles.length + profileData.audioSamples.length}/3)
+              </h4>
 
-                {/* Existing Audio Files */}
-                {existingAudioFiles.length > 0 && (
-                  <div className="space-y-3 mb-4">
-                    {existingAudioFiles.map((file) => (
-                      <div
-                        key={file.uuid}
-                        className="bg-gray-800 rounded-xl p-4 flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="bg-green-500/20 p-3 rounded-lg">
-                            <Headphones className="h-6 w-6 text-green-400" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium">{file.fileName}</p>
-                            <p className="text-sm text-gray-500">
-                              Uploaded{" "}
-                              {new Date(file.uploadDate).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <audio
-                            controls
-                            src={audioAPI.getAudioFileUrl(file.uuid)}
-                            className="h-10"
-                          />
+              {existingAudioFiles.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {existingAudioFiles.map((file) => (
+                    <div
+                      key={file.uuid}
+                      className="bg-gray-800 rounded-xl p-3 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="bg-green-500/20 p-2 rounded-lg flex-shrink-0">
+                          <Headphones className="h-5 w-5 text-green-400" />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeExistingAudioFile(file.uuid)}
-                          className="text-gray-400 hover:text-red-400 p-2 ml-2"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* New Audio Files */}
-                {profileData.audioSamples.length > 0 && (
-                  <div className="space-y-3 mb-4">
-                    {profileData.audioSamples.map((file, index) => (
-                      <div
-                        key={index}
-                        className="bg-gray-800 rounded-xl p-4 flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="bg-amber-500/20 p-3 rounded-lg">
-                            <Headphones className="h-6 w-6 text-amber-400" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{file.name}</p>
-                            <p className="text-sm text-gray-500">
-                              {(file.size / (1024 * 1024)).toFixed(2)} MB • New
-                            </p>
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">
+                            {file.fileName}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Uploaded{" "}
+                            {new Date(file.uploadDate).toLocaleDateString()}
+                          </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeAudioSample(index)}
-                          className="text-gray-400 hover:text-red-400 p-2"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
+                        <audio
+                          controls
+                          src={audioAPI.getAudioFileUrl(file.uuid)}
+                          className="h-8 w-32"
+                        />
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Upload Button */}
-                {existingAudioFiles.length + profileData.audioSamples.length <
-                  3 && (
-                  <div className="border-2 border-dashed border-gray-700 rounded-2xl p-8 text-center hover:border-amber-500 transition">
-                    <input
-                      type="file"
-                      id="audio-upload"
-                      accept="audio/*"
-                      multiple
-                      onChange={handleAudioUpload}
-                      className="hidden"
-                    />
-                    <label htmlFor="audio-upload" className="cursor-pointer">
-                      <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <h4 className="text-lg font-semibold mb-2">
-                        Upload Audio Samples
-                      </h4>
-                      <p className="text-gray-500 mb-4">
-                        MP3, WAV, or M4A files • Max 3 files total, 50MB each
-                      </p>
                       <button
                         type="button"
-                        onClick={() =>
-                          document.getElementById("audio-upload")?.click()
-                        }
-                        className="bg-gray-800 hover:bg-gray-700 px-6 py-2 rounded-full font-medium transition"
+                        onClick={() => removeExistingAudioFile(file.uuid)}
+                        className="text-gray-400 hover:text-red-400 p-2 ml-2 flex-shrink-0"
                       >
-                        Choose Files
+                        <Trash2 className="h-4 w-4" />
                       </button>
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Availability
-                </label>
-                <textarea
-                  value={profileData.availability}
-                  onChange={(e) =>
-                    handleProfileChange("availability", e.target.value)
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                    }
-                  }}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500"
-                  placeholder="e.g., 'Available for jam sessions on weekends', 'Looking for weekly rehearsals'"
-                  rows={3}
-                  maxLength={255}
-                />
-                <div className="flex justify-between items-center text-sm text-gray-500 mt-2">
-                  <span>
-                    Let others know when you're available to collaborate
-                  </span>
-                  <span>{profileData.availability.length}/255</span>
+                    </div>
+                  ))}
                 </div>
+              )}
+
+              {profileData.audioSamples.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {profileData.audioSamples.map((file, index) => (
+                    <div
+                      key={index}
+                      className="bg-gray-800 rounded-xl p-3 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="bg-amber-500/20 p-2 rounded-lg">
+                          <Headphones className="h-5 w-5 text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{file.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {(file.size / (1024 * 1024)).toFixed(2)} MB • New
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeAudioSample(index)}
+                        className="text-gray-400 hover:text-red-400 p-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {existingAudioFiles.length + profileData.audioSamples.length <
+                3 && (
+                <div className="border-2 border-dashed border-gray-700 rounded-2xl p-6 text-center hover:border-amber-500 transition">
+                  <input
+                    type="file"
+                    id="audio-upload"
+                    accept="audio/*"
+                    multiple
+                    onChange={handleAudioUpload}
+                    className="hidden"
+                  />
+                  <label htmlFor="audio-upload" className="cursor-pointer">
+                    <Upload className="h-10 w-10 mx-auto mb-3 text-gray-400" />
+                    <h4 className="font-semibold mb-1">Upload Audio Samples</h4>
+                    <p className="text-gray-500 text-sm mb-3">
+                      MP3, WAV, or M4A • Max 3 total, 50MB each
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        document.getElementById("audio-upload")?.click()
+                      }
+                      className="bg-gray-800 hover:bg-gray-700 px-5 py-2 rounded-full text-sm font-medium transition"
+                    >
+                      Choose Files
+                    </button>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5">
+              <label className="block text-sm font-medium mb-2">
+                Availability
+              </label>
+              <textarea
+                value={profileData.availability}
+                onChange={(e) =>
+                  handleProfileChange("availability", e.target.value)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) e.preventDefault();
+                }}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 resize-none"
+                placeholder="e.g., 'Available for jam sessions on weekends'"
+                rows={3}
+                maxLength={255}
+              />
+              <div className="flex justify-between items-center text-sm text-gray-500 mt-2">
+                <span>Let others know when you're available</span>
+                <span>{profileData.availability.length}/255</span>
               </div>
             </div>
           </div>
         );
     }
   };
+
+  // Profile Preview Component (always visible on the right)
+  const ProfilePreview = () => (
+    <div className="bg-gray-900/30 rounded-2xl p-6 border border-gray-800 sticky top-24">
+      <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+        <User className="h-5 w-5" />
+        Profile Preview
+      </h3>
+      <div className="space-y-4">
+        <div className="bg-gray-800 rounded-xl p-4">
+          <h4 className="font-semibold mb-3">Basic Info</h4>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-500/20 flex items-center justify-center overflow-hidden flex-shrink-0">
+              {profileData.profilePicture ? (
+                <img
+                  src={URL.createObjectURL(profileData.profilePicture)}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                />
+              ) : existingProfilePictureUrl ? (
+                <img
+                  src={existingProfilePictureUrl}
+                  alt="Current profile"
+                  className="h-full w-full object-cover"
+                  onError={() => setExistingProfilePictureUrl(null)}
+                />
+              ) : (
+                <User className="h-6 w-6 text-gray-400" />
+              )}
+            </div>
+            <div>
+              <p className="text-amber-400 text-lg font-medium">
+                {profileData.displayName || "Your Name"}
+              </p>
+            </div>
+          </div>
+          {profileData.instruments.length > 0 && (
+            <div>
+              <p className="text-sm text-gray-400 mb-1">Plays:</p>
+              <div className="flex flex-wrap gap-1">
+                {profileData.instruments.map((inst) => (
+                  <span
+                    key={inst}
+                    className="bg-amber-500/10 text-amber-300 px-2 py-1 rounded-full text-xs"
+                  >
+                    {inst}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-gray-800 rounded-xl p-4">
+          <h4 className="font-semibold mb-2">Genres & Experience</h4>
+          <div className="flex flex-wrap gap-1 mb-3">
+            {profileData.genres.slice(0, 3).map((genre) => (
+              <span
+                key={genre}
+                className="bg-amber-500/10 text-amber-300 px-2 py-1 rounded-full text-xs"
+              >
+                {genre}
+              </span>
+            ))}
+            {profileData.genres.length > 3 && (
+              <span className="text-gray-400 text-xs">
+                +{profileData.genres.length - 3} more
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-400">
+            {profileData.experienceLevel || "Experience level not set"}
+          </p>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl p-4">
+          <h4 className="font-semibold mb-2 flex items-center gap-2">
+            <Headphones className="h-5 w-5" />
+            Audio Samples
+          </h4>
+          {existingAudioFiles.length + profileData.audioSamples.length > 0 ? (
+            <div className="space-y-2">
+              {existingAudioFiles.map((file) => (
+                <div
+                  key={file.uuid}
+                  className="flex items-center gap-2 p-2 bg-gray-900/50 rounded-lg"
+                >
+                  <Volume2 className="h-3 w-3 text-green-400 flex-shrink-0" />
+                  <span className="text-xs truncate">{file.fileName}</span>
+                </div>
+              ))}
+              {profileData.audioSamples.map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 p-2 bg-gray-900/50 rounded-lg"
+                >
+                  <Volume2 className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                  <span className="text-xs truncate">{file.name}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500 italic">No audio samples yet</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   const pageTitle = isEditingMode
     ? "Edit Your Profile"
@@ -1082,23 +1118,19 @@ function ProfileCreation() {
         </button>
       </nav>
 
-      {/* Progress Bar - Hide step 1 in edit mode since we skip it */}
-      <div className="container mx-auto px-6 max-w-4xl">
-        <div className="flex items-center justify-between mb-12">
+      <div className="container mx-auto px-6 max-w-6xl">
+        {/* Progress Bar */}
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             {isEditingMode
-              ? // Edit mode: only show steps 2, 3, 4 (relabeled as 1, 2, 3)
-                [2, 3, 4].map((actualStep, index) => {
+              ? [2, 3, 4].map((actualStep, index) => {
                   const displayNumber = index + 1;
                   const isActive = step >= actualStep;
                   const isCompleted = step > actualStep;
-
                   return (
                     <div key={actualStep} className="flex items-center">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          isActive ? "bg-amber-600" : "bg-gray-800"
-                        }`}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center ${isActive ? "bg-amber-600" : "bg-gray-800"}`}
                       >
                         {isCompleted ? (
                           <div className="w-4 h-4 bg-amber-200 rounded-full" />
@@ -1108,25 +1140,19 @@ function ProfileCreation() {
                       </div>
                       {actualStep < 4 && (
                         <div
-                          className={`w-12 h-1 mx-2 ${
-                            isCompleted ? "bg-amber-600" : "bg-gray-800"
-                          }`}
+                          className={`w-12 h-1 mx-2 ${isCompleted ? "bg-amber-600" : "bg-gray-800"}`}
                         />
                       )}
                     </div>
                   );
                 })
-              : // New user mode: show all 4 steps
-                [1, 2, 3, 4].map((s) => {
+              : [1, 2, 3, 4].map((s) => {
                   const isActive = step >= s;
                   const isCompleted = step > s;
-
                   return (
                     <div key={s} className="flex items-center">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          isActive ? "bg-amber-600" : "bg-gray-800"
-                        }`}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center ${isActive ? "bg-amber-600" : "bg-gray-800"}`}
                       >
                         {isCompleted ? (
                           <div className="w-4 h-4 bg-amber-200 rounded-full" />
@@ -1136,9 +1162,7 @@ function ProfileCreation() {
                       </div>
                       {s < 4 && (
                         <div
-                          className={`w-12 h-1 mx-2 ${
-                            isCompleted ? "bg-amber-600" : "bg-gray-800"
-                          }`}
+                          className={`w-12 h-1 mx-2 ${isCompleted ? "bg-amber-600" : "bg-gray-800"}`}
                         />
                       )}
                     </div>
@@ -1150,174 +1174,68 @@ function ProfileCreation() {
           </div>
         </div>
 
-        {/* Form Container */}
-        <div className="bg-gray-900/50 backdrop-blur-sm rounded-3xl p-8 border border-gray-800">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold mb-2">{pageTitle}</h1>
-            <p className="text-gray-400">{pageSubtitle}</p>
-          </div>
-
-          <div>
-            {renderStep()}
-
-            <div className="flex justify-between mt-12 pt-8 border-t border-gray-800">
-              {(step > 1 && !isEditingMode) || (isEditingMode && step > 2) ? (
-                <button
-                  type="button"
-                  onClick={handlePreviousStep}
-                  className="px-8 py-3 rounded-full border border-gray-700 hover:bg-gray-800 transition"
-                >
-                  Previous
-                </button>
-              ) : (
-                <div></div>
-              )}
-
-              {step < 4 ? (
-                <button
-                  type="button"
-                  onClick={
-                    step === 1 && !isEditingMode
-                      ? handleRegister
-                      : handleNextStep
-                  }
-                  disabled={isSubmitting}
-                  className="bg-amber-600 hover:bg-amber-700 px-8 py-3 rounded-full font-semibold transition disabled:opacity-50"
-                >
-                  {step === 1 && !isEditingMode
-                    ? isSubmitting
-                      ? "Creating Account..."
-                      : "Continue"
-                    : "Continue"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleUpdateProfile}
-                  disabled={isSubmitting}
-                  className={`bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-amber-700 px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 ${
-                    isSubmitting ? "opacity-70 cursor-not-allowed" : ""
-                  }`}
-                >
-                  {isSubmitting ? "Saving..." : submitButtonText}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Profile Preview */}
-        <div className="mt-12 bg-gray-900/30 rounded-2xl p-6 border border-gray-800">
-          <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Profile Preview
-          </h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <div className="bg-gray-800 rounded-xl p-4 mb-4">
-                <h4 className="font-semibold mb-2">Basic Info</h4>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-500/20 flex items-center justify-center overflow-hidden">
-                    {profileData.profilePicture ? (
-                      <img
-                        src={URL.createObjectURL(profileData.profilePicture)}
-                        alt="Profile"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : existingProfilePictureUrl ? (
-                      <img
-                        src={existingProfilePictureUrl}
-                        alt="Current profile"
-                        className="h-full w-full object-cover"
-                        onError={() => setExistingProfilePictureUrl(null)}
-                      />
-                    ) : (
-                      <User className="h-6 w-6 text-gray-400" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-amber-400 text-lg">
-                      {profileData.displayName || "Your Name"}
-                    </p>
-                  </div>
-                </div>
-                {profileData.instruments.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-400">Plays:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {profileData.instruments.map((inst) => (
-                        <span
-                          key={inst}
-                          className="bg-amber-500/20 text-amber-300 px-2 py-1 rounded-full text-xs"
-                        >
-                          {inst}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+        {/* Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Form */}
+          <div className="lg:col-span-2">
+            <div className="bg-gray-900/50 backdrop-blur-sm rounded-3xl p-8 border border-gray-800">
+              <div className="mb-8">
+                <h1 className="text-4xl font-bold mb-2">{pageTitle}</h1>
+                <p className="text-gray-400">{pageSubtitle}</p>
               </div>
-            </div>
 
-            <div className="space-y-4">
-              <div className="bg-gray-800 rounded-xl p-4">
-                <h4 className="font-semibold mb-2">Genres & Experience</h4>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {profileData.genres.slice(0, 3).map((genre) => (
-                    <span
-                      key={genre}
-                      className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-sm"
+              <div>
+                {renderStep()}
+
+                <div className="flex justify-between mt-10 pt-6 border-t border-gray-800">
+                  {(step > 1 && !isEditingMode) ||
+                  (isEditingMode && step > 2) ? (
+                    <button
+                      type="button"
+                      onClick={handlePreviousStep}
+                      className="px-8 py-3 rounded-full border border-gray-700 hover:bg-gray-800 transition"
                     >
-                      {genre}
-                    </span>
-                  ))}
-                  {profileData.genres.length > 3 && (
-                    <span className="text-gray-400 text-sm">
-                      +{profileData.genres.length - 3} more
-                    </span>
+                      Previous
+                    </button>
+                  ) : (
+                    <div></div>
+                  )}
+
+                  {step < 4 ? (
+                    <button
+                      type="button"
+                      onClick={
+                        step === 1 && !isEditingMode
+                          ? handleRegister
+                          : handleNextStep
+                      }
+                      disabled={isSubmitting}
+                      className="bg-amber-600 hover:bg-amber-700 px-8 py-3 rounded-full font-semibold transition disabled:opacity-50"
+                    >
+                      {step === 1 && !isEditingMode
+                        ? isSubmitting
+                          ? "Creating Account..."
+                          : "Continue"
+                        : "Continue"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleUpdateProfile}
+                      disabled={isSubmitting}
+                      className={`bg-amber-600 hover:bg-amber-700 px-8 py-3 rounded-full font-bold text-lg transition ${isSubmitting ? "opacity-70 cursor-not-allowed" : ""}`}
+                    >
+                      {isSubmitting ? "Saving..." : submitButtonText}
+                    </button>
                   )}
                 </div>
-                <p className="text-gray-400">
-                  {profileData.experienceLevel || "Experience level"}
-                </p>
-              </div>
-
-              <div className="bg-gray-800 rounded-xl p-4">
-                <h4 className="font-semibold mb-2 flex items-center gap-2">
-                  <Headphones className="h-5 w-5" />
-                  Audio Samples
-                </h4>
-                {existingAudioFiles.length + profileData.audioSamples.length >
-                0 ? (
-                  <div className="space-y-3">
-                    {existingAudioFiles.map((file) => (
-                      <div
-                        key={file.uuid}
-                        className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg"
-                      >
-                        <Volume2 className="h-4 w-4 text-green-400" />
-                        <span className="text-sm truncate flex-1">
-                          {file.fileName}
-                        </span>
-                      </div>
-                    ))}
-                    {profileData.audioSamples.map((file, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg"
-                      >
-                        <Volume2 className="h-4 w-4 text-amber-400" />
-                        <span className="text-sm truncate flex-1">
-                          {file.name}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 italic">No audio samples yet</p>
-                )}
               </div>
             </div>
+          </div>
+
+          {/* Right Column - Profile Preview */}
+          <div className="lg:col-span-1">
+            <ProfilePreview />
           </div>
         </div>
       </div>

@@ -7,7 +7,7 @@ import {
   User,
   Mail,
   Calendar,
-  Heart,
+  FolderOpen,
   Volume2,
   Headphones,
   Award,
@@ -38,6 +38,18 @@ interface UserProfileData {
   genres: string[];
 }
 
+interface ProjectData {
+  id: number;
+  name: string;
+  founderID: number;
+  description: string;
+  status: string;
+  creationDate: string;
+  memberRoles: {
+    [roleName: string]: any | null;
+  };
+}
+
 function UserProfile() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -54,6 +66,14 @@ function UserProfile() {
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(
     null,
   );
+
+  // user projects
+  const [userProjects, setUserProjects] = useState<ProjectData[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  // similar musicians
+  const [similarMusicians, setSimilarMusicians] = useState<any[]>([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
 
   // Audio samples state
   const [audioFiles, setAudioFiles] = useState<AudioFileResponse[]>([]);
@@ -80,6 +100,14 @@ function UserProfile() {
 
         // Load audio files for this user
         await loadAudioFiles(parseInt(id));
+        // Load projects for this user
+        await fetchUserProjects(parseInt(id));
+        // Load similar musicians for this user
+        await fetchSimilarMusicians(
+          parseInt(id),
+          profileData.instruments,
+          profileData.genres,
+        );
 
         // If user is authenticated, also load their own profile for comparison
         if (isAuthenticated && user) {
@@ -243,6 +271,27 @@ function UserProfile() {
     }
   };
 
+  const fetchUserProjects = async (userId: number) => {
+    setLoadingProjects(true);
+    try {
+      const response = await fetch(`/api/projects?founderId=${userId}`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projects: ${response.status}`);
+      }
+
+      const projects: ProjectData[] = await response.json();
+      setUserProjects(projects);
+    } catch (error) {
+      console.error("Failed to fetch user projects:", error);
+      setUserProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
   const getExperienceLevelColor = (level: string) => {
     switch (level?.toUpperCase()) {
       case "BEGINNER":
@@ -255,6 +304,58 @@ function UserProfile() {
         return "text-amber-400 bg-amber-900/20";
       default:
         return "text-gray-400 bg-gray-900/20";
+    }
+  };
+
+  const fetchSimilarMusicians = async (
+    userId: number,
+    instruments: string[],
+    genres: string[],
+  ) => {
+    setLoadingSimilar(true);
+    try {
+      // Search by the user's instruments
+      let similar: any[] = [];
+
+      if (instruments.length > 0) {
+        const instrumentResults = await fetch(
+          `/api/search?instrument=${encodeURIComponent(instruments[0])}&type=users`,
+          { credentials: "include" },
+        );
+
+        if (instrumentResults.ok) {
+          const data = await instrumentResults.json();
+          similar = [...(data.users || [])];
+        }
+      }
+
+      // Also search by genre if we have few results
+      if (genres.length > 0 && similar.length < 5) {
+        const genreResults = await fetch(
+          `/api/search?genre=${encodeURIComponent(genres[0])}&type=users`,
+          { credentials: "include" },
+        );
+
+        if (genreResults.ok) {
+          const data = await genreResults.json();
+          const existingIds = new Set(similar.map((u: any) => u.id));
+          (data.users || []).forEach((user: any) => {
+            if (!existingIds.has(user.id)) {
+              similar.push(user);
+            }
+          });
+        }
+      }
+
+      // Filter out the current user and limit to 5
+      const filtered = similar.filter((u: any) => u.id !== userId).slice(0, 5);
+
+      setSimilarMusicians(filtered);
+    } catch (error) {
+      console.error("Failed to fetch similar musicians:", error);
+      setSimilarMusicians([]);
+    } finally {
+      setLoadingSimilar(false);
     }
   };
 
@@ -461,9 +562,6 @@ function UserProfile() {
                   {isAuthenticated && !isOwnProfile && (
                     <>
                       <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
-                        <Heart className="h-5 w-5" />
-                      </button>
-                      <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
                         <Share2 className="h-5 w-5" />
                       </button>
                       <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
@@ -474,8 +572,8 @@ function UserProfile() {
                 </div>
               </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-6 mt-6 max-w-md">
+              {/* Stats*/}
+              <div className="grid grid-cols-4 gap-4 mt-6 max-w-lg">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-amber-400">
                     {profile.instruments?.length || 0}
@@ -490,9 +588,15 @@ function UserProfile() {
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-amber-400">
+                    {userProjects.length}
+                  </p>
+                  <p className="text-xs text-gray-400">Projects</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-400">
                     {audioFiles.length}
                   </p>
-                  <p className="text-xs text-gray-400">Audio Samples</p>
+                  <p className="text-xs text-gray-400">Audio</p>
                 </div>
               </div>
             </div>
@@ -598,20 +702,186 @@ function UserProfile() {
             {activeTab === "projects" && (
               <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                 <h2 className="text-xl font-bold mb-4">Projects</h2>
-                <div className="text-center py-12">
-                  <Users className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400">No projects to display yet</p>
-                </div>
+
+                {loadingProjects ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-500"></div>
+                  </div>
+                ) : userProjects.length > 0 ? (
+                  <div className="space-y-4">
+                    {userProjects.map((project) => {
+                      const memberCount = Object.values(
+                        project.memberRoles || {},
+                      ).filter((m) => m !== null).length;
+                      return (
+                        <div
+                          key={project.id}
+                          className="bg-gray-800/30 rounded-xl p-4 border border-gray-700 hover:border-amber-500/30 transition cursor-pointer"
+                          onClick={() => navigate(`/project/${project.id}`)}
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <h3 className="text-lg font-bold">
+                              {project.name}
+                            </h3>
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs capitalize ${
+                                project.status === "active"
+                                  ? "bg-green-900/30 text-green-400"
+                                  : project.status === "recruiting"
+                                    ? "bg-blue-900/30 text-blue-400"
+                                    : "bg-yellow-900/30 text-yellow-400"
+                              }`}
+                            >
+                              {project.status}
+                            </span>
+                          </div>
+                          <p className="text-gray-400 text-sm mb-3 line-clamp-2">
+                            {project.description}
+                          </p>
+                          <div className="flex items-center gap-4 text-sm text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Users className="h-4 w-4" />
+                              {memberCount} member{memberCount !== 1 ? "s" : ""}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              {new Date(
+                                project.creationDate,
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Users className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-400">No projects to display yet</p>
+                    {isOwnProfile && (
+                      <button
+                        onClick={() => navigate("/create-project")}
+                        className="mt-4 bg-amber-600 hover:bg-amber-700 px-6 py-3 rounded-full font-medium transition"
+                      >
+                        Create Project
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {activeTab === "activity" && (
               <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                 <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
-                <div className="text-center py-12">
-                  <Star className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400">No recent activity</p>
-                </div>
+
+                {userProjects.length > 0 || audioFiles.length > 0 ? (
+                  <div className="space-y-3">
+                    {/* Projects created */}
+                    {userProjects.map((project) => (
+                      <div
+                        key={`project-${project.id}`}
+                        className="flex items-start gap-4 p-4 bg-gray-800/30 rounded-xl border border-gray-700 hover:border-amber-500/30 transition cursor-pointer"
+                        onClick={() => navigate(`/project/${project.id}`)}
+                      >
+                        <div className="bg-green-500/20 p-2 rounded-lg flex-shrink-0 mt-1">
+                          <FolderOpen className="h-5 w-5 text-green-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm">
+                            Created project{" "}
+                            <span className="font-medium text-amber-400">
+                              {project.name}
+                            </span>
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {new Date(project.creationDate).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              },
+                            )}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs capitalize ${
+                                project.status === "active"
+                                  ? "bg-green-900/30 text-green-400"
+                                  : project.status === "recruiting"
+                                    ? "bg-blue-900/30 text-blue-400"
+                                    : "bg-yellow-900/30 text-yellow-400"
+                              }`}
+                            >
+                              {project.status}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {
+                                Object.values(project.memberRoles || {}).filter(
+                                  (m) => m !== null,
+                                ).length
+                              }{" "}
+                              members
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Audio uploaded */}
+                    {audioFiles.map((file) => (
+                      <div
+                        key={`audio-${file.uuid}`}
+                        className="flex items-start gap-4 p-4 bg-gray-800/30 rounded-xl border border-gray-700"
+                      >
+                        <div className="bg-amber-500/20 p-2 rounded-lg flex-shrink-0 mt-1">
+                          <Volume2 className="h-5 w-5 text-amber-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm">
+                            Uploaded audio sample{" "}
+                            <span className="font-medium text-amber-400">
+                              {file.fileName}
+                            </span>
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {new Date(file.uploadDate).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              },
+                            )}
+                          </p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePlayAudio(file.uuid);
+                            }}
+                            className="mt-2 flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
+                          >
+                            {currentlyPlaying === file.uuid ? (
+                              <>
+                                <Pause className="h-3 w-3" /> Pause
+                              </>
+                            ) : (
+                              <>
+                                <Play className="h-3 w-3" /> Play sample
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Star className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-400">No recent activity</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -721,12 +991,49 @@ function UserProfile() {
               )}
             </div>
 
-            {/* Similar Musicians (placeholder) */}
+            {/* Similar Musicians */}
             <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
               <h3 className="font-bold text-lg mb-4">Similar Musicians</h3>
-              <p className="text-sm text-gray-500">
-                Based on instruments and genres
-              </p>
+
+              {loadingSimilar ? (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-amber-500"></div>
+                </div>
+              ) : similarMusicians.length > 0 ? (
+                <div className="space-y-2">
+                  {similarMusicians.map((musician: any) => (
+                    <button
+                      key={musician.id}
+                      onClick={() => navigate(`/profile/${musician.id}`)}
+                      className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-800/50 transition text-left"
+                    >
+                      <div className="h-8 w-8 rounded-full bg-amber-500/20 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        <img
+                          src={profileAPI.getProfilePictureUrl(musician.id)}
+                          alt={musician.displayName}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">
+                          {musician.displayName}
+                        </p>
+                        <p className="text-xs text-gray-400 truncate">
+                          {musician.instruments?.slice(0, 2).join(", ") ||
+                            "Musician"}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-2">
+                  No similar musicians found
+                </p>
+              )}
             </div>
           </div>
         </div>

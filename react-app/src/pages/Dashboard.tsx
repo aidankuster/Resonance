@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { profileAPI, authAPI, searchAPI } from "../services/api";
 import { useAuthContext } from "../contexts/AuthContext";
@@ -55,6 +55,16 @@ interface ProjectResponse {
   };
 }
 
+// Notification type
+interface NotificationItem {
+  id: string;
+  type: "new_user" | "new_project" | "application" | "project_update";
+  message: string;
+  link?: string;
+  time: string;
+  read: boolean;
+}
+
 function Dashboard() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthContext();
@@ -89,6 +99,10 @@ function Dashboard() {
     activeProjects: 0,
   });
 
+  // Notifications state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
   // Handle search submission
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +110,29 @@ function Dashboard() {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
+
+  // Close notifications when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".notification-area")) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener("click", handleClickOutside);
+    }
+
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showNotifications]);
+
+  // Generate notifications when suggested musicians or projects change
+  useEffect(() => {
+    if (suggestedMusicians.length > 0 || userProjects.length > 0) {
+      generateNotifications(suggestedMusicians, userProjects);
+    }
+  }, [suggestedMusicians, userProjects, platformStats]);
 
   // Load user profile and fetch discoverable musicians
   useEffect(() => {
@@ -163,6 +200,51 @@ function Dashboard() {
     }
   }, [navigate, isAuthenticated, user, authLoading]);
 
+  // Generate notifications from platform data
+  const generateNotifications = (
+    musicians: SearchResultUser[],
+    projects: ProjectResponse[],
+  ) => {
+    const items: NotificationItem[] = [];
+
+    // New musicians (from discover list)
+    musicians.slice(0, 2).forEach((musician) => {
+      items.push({
+        id: `user-${musician.id}`,
+        type: "new_user",
+        message: `${musician.displayName} joined the platform`,
+        link: `/profile/${musician.id}`,
+        time: "Recently",
+        read: false,
+      });
+    });
+
+    // New projects
+    projects.slice(0, 2).forEach((project) => {
+      items.push({
+        id: `project-${project.id}`,
+        type: "new_project",
+        message: `New project "${project.name}" is recruiting`,
+        link: `/project/${project.id}`,
+        time: "Recently",
+        read: false,
+      });
+    });
+
+    // Platform milestone
+    if (musicians.length > 0 || projects.length > 0) {
+      items.push({
+        id: `milestone-${Date.now()}`,
+        type: "project_update",
+        message: `Platform now has ${platformStats.activeMusicians} musicians and ${platformStats.activeProjects} projects`,
+        time: "Today",
+        read: false,
+      });
+    }
+
+    setNotifications(items);
+  };
+
   // Fetch platform statistics
   const fetchPlatformStats = async () => {
     try {
@@ -193,7 +275,6 @@ function Dashboard() {
       );
     } catch (error) {
       console.error("❌ Failed to fetch platform stats:", error);
-      // Keep default zeros
     }
   };
 
@@ -207,10 +288,8 @@ function Dashboard() {
     try {
       console.log("🔍 Fetching discoverable musicians...");
 
-      // Search for users with matching instruments or genres
       let allUsers: SearchResultUser[] = [];
 
-      // Try searching with the user's primary instrument first
       if (userInstruments.length > 0) {
         const primaryInstrument = userInstruments[0];
         const instrumentResults = await searchAPI.searchUsers({
@@ -219,14 +298,12 @@ function Dashboard() {
         allUsers = [...instrumentResults];
       }
 
-      // Also search with primary genre if we have few results
       if (userGenres.length > 0 && allUsers.length < 10) {
         const primaryGenre = userGenres[0];
         const genreResults = await searchAPI.searchUsers({
           genre: primaryGenre,
         });
 
-        // Merge results, avoiding duplicates
         const existingIds = new Set(allUsers.map((u) => u.id));
         genreResults.forEach((user) => {
           if (!existingIds.has(user.id)) {
@@ -235,7 +312,6 @@ function Dashboard() {
         });
       }
 
-      // If still few results, do a general search
       if (allUsers.length < 5) {
         const generalResults = await searchAPI.searchUsers({});
         const existingIds = new Set(allUsers.map((u) => u.id));
@@ -246,7 +322,6 @@ function Dashboard() {
         });
       }
 
-      // Filter out the current user and limit to 6 musicians
       const filteredUsers = allUsers
         .filter((musician) => musician.id !== currentUserId)
         .slice(0, 6);
@@ -257,7 +332,6 @@ function Dashboard() {
       setSuggestedMusicians(filteredUsers);
     } catch (error) {
       console.error("❌ Failed to fetch discoverable musicians:", error);
-      // Set empty array on error
       setSuggestedMusicians([]);
     } finally {
       setLoadingMusicians(false);
@@ -307,7 +381,6 @@ function Dashboard() {
 
   const handleGenerateFlyer = () => {
     console.log("Generate flyer clicked");
-    // TODO: Implement flyer generation
   };
 
   const handleManageAudio = () => {
@@ -335,7 +408,6 @@ function Dashboard() {
     return level.charAt(0) + level.slice(1).toLowerCase();
   };
 
-  // Helper function to get match percentage
   const calculateMatchPercentage = (musician: SearchResultUser): number => {
     if (musician.matchPercentage !== undefined) {
       return musician.matchPercentage;
@@ -343,7 +415,6 @@ function Dashboard() {
     return Math.floor(Math.random() * 20) + 75;
   };
 
-  // Helper to get status color for project cards
   const getProjectStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "active":
@@ -365,6 +436,8 @@ function Dashboard() {
       </div>
     );
   }
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white">
@@ -392,10 +465,124 @@ function Dashboard() {
           </div>
 
           <div className="flex items-center space-x-6">
-            <button className="relative p-2 hover:bg-gray-800 rounded-full transition">
-              <Bell className="h-6 w-6" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-            </button>
+            {/* Notification Bell with Dropdown */}
+            <div className="notification-area relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 hover:bg-gray-800 rounded-full transition"
+              >
+                <Bell className="h-6 w-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-gray-900 rounded-2xl border border-gray-700 shadow-2xl overflow-hidden z-50">
+                  <div className="p-4 border-b border-gray-800">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-bold text-lg">Notifications</h3>
+                      <button
+                        onClick={() =>
+                          setNotifications((prev) =>
+                            prev.map((n) => ({ ...n, read: true })),
+                          )
+                        }
+                        className="text-xs text-amber-400 hover:text-amber-300"
+                      >
+                        Mark all read
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length > 0 ? (
+                      notifications.map((notification) => (
+                        <button
+                          key={notification.id}
+                          onClick={() => {
+                            if (notification.link) navigate(notification.link);
+                            setNotifications((prev) =>
+                              prev.map((n) =>
+                                n.id === notification.id
+                                  ? { ...n, read: true }
+                                  : n,
+                              ),
+                            );
+                            setShowNotifications(false);
+                          }}
+                          className={`w-full text-left p-4 border-b border-gray-800/50 hover:bg-gray-800/50 transition flex items-start gap-3 ${
+                            !notification.read ? "bg-amber-900/10" : ""
+                          }`}
+                        >
+                          <div
+                            className={`p-2 rounded-lg flex-shrink-0 ${
+                              notification.type === "new_user"
+                                ? "bg-blue-500/20"
+                                : notification.type === "new_project"
+                                  ? "bg-green-500/20"
+                                  : notification.type === "application"
+                                    ? "bg-purple-500/20"
+                                    : "bg-amber-500/20"
+                            }`}
+                          >
+                            {notification.type === "new_user" && (
+                              <User className="h-4 w-4 text-blue-400" />
+                            )}
+                            {notification.type === "new_project" && (
+                              <FolderOpen className="h-4 w-4 text-green-400" />
+                            )}
+                            {notification.type === "application" && (
+                              <FileText className="h-4 w-4 text-purple-400" />
+                            )}
+                            {notification.type === "project_update" && (
+                              <TrendingUp className="h-4 w-4 text-amber-400" />
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm ${!notification.read ? "font-medium text-white" : "text-gray-300"}`}
+                            >
+                              {notification.message}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {notification.time}
+                            </p>
+                          </div>
+
+                          {!notification.read && (
+                            <div className="h-2 w-2 bg-amber-500 rounded-full flex-shrink-0 mt-2"></div>
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-6 text-center">
+                        <Bell className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">
+                          No notifications yet
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3 border-t border-gray-800 text-center">
+                    <button
+                      onClick={() => {
+                        setNotifications([]);
+                        setShowNotifications(false);
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-400"
+                    >
+                      Clear all notifications
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center space-x-3">
               <div className="text-right">
@@ -486,7 +673,6 @@ function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Experience Level */}
                   <div className="bg-gray-800/50 p-3 rounded-xl">
                     <div className="flex items-center gap-2 mb-1">
                       <Award className="h-4 w-4 text-amber-400" />
@@ -497,7 +683,6 @@ function Dashboard() {
                     </p>
                   </div>
 
-                  {/* Genres */}
                   {userProfile.genres.length > 0 && (
                     <div className="bg-gray-800/50 p-3 rounded-xl">
                       <p className="text-xs text-gray-400 mb-2">Genres</p>
@@ -728,7 +913,6 @@ function Dashboard() {
                               {musician.experienceLevel?.toLowerCase() ||
                                 "beginner"}
                             </span>
-                            {/* Removed eye, heart, and contact buttons */}
                             <div></div>
                           </div>
                         </div>
@@ -756,12 +940,8 @@ function Dashboard() {
                 {/* Quick Actions Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
                   <div className="bg-gray-900/30 rounded-2xl p-6 border border-gray-800">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="bg-amber-500/20 p-3 rounded-xl">
-                        <FileText className="h-6 w-6 text-amber-400" />
-                      </div>
-                      <h3 className="font-bold">Generate Flyer</h3>
-                    </div>
+                    <FileText className="h-6 w-6 text-amber-400 mb-3" />
+                    <h3 className="font-bold mb-2">Generate Flyer</h3>
                     <p className="text-gray-400 text-sm mb-4">
                       Create a printable PDF of your profile to post around
                       campus
@@ -775,12 +955,8 @@ function Dashboard() {
                   </div>
 
                   <div className="bg-gray-900/30 rounded-2xl p-6 border border-gray-800">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="bg-amber-500/20 p-3 rounded-xl">
-                        <Calendar className="h-6 w-6 text-amber-400" />
-                      </div>
-                      <h3 className="font-bold">Upcoming Events</h3>
-                    </div>
+                    <Calendar className="h-6 w-6 text-amber-400 mb-3" />
+                    <h3 className="font-bold mb-2">Upcoming Events</h3>
                     <p className="text-gray-400 text-sm mb-4">
                       No upcoming events scheduled
                     </p>
@@ -790,12 +966,8 @@ function Dashboard() {
                   </div>
 
                   <div className="bg-gray-900/30 rounded-2xl p-6 border border-gray-800">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="bg-amber-500/20 p-3 rounded-xl">
-                        <Volume2 className="h-6 w-6 text-amber-400" />
-                      </div>
-                      <h3 className="font-bold">Audio Library</h3>
-                    </div>
+                    <Volume2 className="h-6 w-6 text-amber-400 mb-3" />
+                    <h3 className="font-bold mb-2">Audio Library</h3>
                     <p className="text-gray-400 text-sm mb-4">
                       Upload and manage your audio samples
                     </p>
@@ -841,7 +1013,6 @@ function Dashboard() {
                       const memberCount = Object.values(
                         project.memberRoles || {},
                       ).filter((member) => member !== null).length;
-
                       return (
                         <div
                           key={project.id}
@@ -858,11 +1029,9 @@ function Dashboard() {
                               {project.status}
                             </span>
                           </div>
-
                           <p className="text-gray-300 text-sm mb-4 line-clamp-2">
                             {project.description}
                           </p>
-
                           <div className="flex items-center justify-between pt-4 border-t border-gray-800">
                             <div className="flex items-center gap-2">
                               <Users className="h-4 w-4 text-gray-400" />
@@ -893,14 +1062,11 @@ function Dashboard() {
             {activeTab === "activity" && (
               <div className="space-y-8">
                 <h2 className="text-2xl font-bold">Recent Activity</h2>
-                <div className="bg-gray-900/30 rounded-2xl p-12 text-center border border-gray-800">
-                  <Clock className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold mb-2">No recent activity</h3>
-                  <p className="text-gray-400">
-                    Activity will appear here as you interact with other
-                    musicians
-                  </p>
-                </div>
+
+                <DashboardActivity
+                  userProjects={userProjects}
+                  currentUserId={user?.id || 0}
+                />
               </div>
             )}
 
@@ -909,12 +1075,8 @@ function Dashboard() {
                 <h2 className="text-2xl font-bold">Tools</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="bg-amber-500/20 p-3 rounded-xl">
-                        <Download className="h-8 w-8 text-amber-400" />
-                      </div>
-                      <h3 className="text-xl font-bold">Flyer Generator</h3>
-                    </div>
+                    <Download className="h-8 w-8 text-amber-400 mb-3" />
+                    <h3 className="text-xl font-bold mb-2">Flyer Generator</h3>
                     <p className="text-gray-400 mb-6">
                       Create a printable PDF flyer of your profile to post
                       around campus.
@@ -928,12 +1090,8 @@ function Dashboard() {
                   </div>
 
                   <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="bg-amber-500/20 p-3 rounded-xl">
-                        <Share2 className="h-8 w-8 text-amber-400" />
-                      </div>
-                      <h3 className="text-xl font-bold">Share Profile</h3>
-                    </div>
+                    <Share2 className="h-8 w-8 text-amber-400 mb-3" />
+                    <h3 className="text-xl font-bold mb-2">Share Profile</h3>
                     <p className="text-gray-400 mb-6">
                       Share your profile link with other musicians or on social
                       media.
@@ -952,27 +1110,17 @@ function Dashboard() {
             {activeTab === "settings" && (
               <div className="space-y-8">
                 <h2 className="text-2xl font-bold">Settings</h2>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
-                      <h3 className="font-bold text-lg mb-6">
-                        Profile Settings
-                      </h3>
-                      <div className="space-y-4">
-                        <button
-                          onClick={() =>
-                            user?.id &&
-                            navigate(
-                              `/create-profile?edit=true&userId=${user.id}`,
-                            )
-                          }
-                          className="w-full bg-amber-600 hover:bg-amber-700 py-3 rounded-full font-medium transition"
-                        >
-                          Edit Profile
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
+                  <h3 className="font-bold text-lg mb-6">Profile Settings</h3>
+                  <button
+                    onClick={() =>
+                      user?.id &&
+                      navigate(`/create-profile?edit=true&userId=${user.id}`)
+                    }
+                    className="w-full bg-amber-600 hover:bg-amber-700 py-3 rounded-full font-medium transition"
+                  >
+                    Edit Profile
+                  </button>
                 </div>
               </div>
             )}
@@ -987,9 +1135,7 @@ function Dashboard() {
                   Department Announcements
                 </h3>
                 {departmentAnnouncements.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Announcements will be mapped here when API is ready */}
-                  </div>
+                  <div className="space-y-4"></div>
                 ) : (
                   <p className="text-gray-400 text-sm text-center py-4">
                     No announcements at this time
@@ -1036,3 +1182,181 @@ function Dashboard() {
 }
 
 export default Dashboard;
+
+// Activity component for the Activity tab
+const DashboardActivity = ({
+  userProjects,
+  currentUserId,
+}: {
+  userProjects: ProjectResponse[];
+  currentUserId: number;
+}) => {
+  const [joinedProjects, setJoinedProjects] = useState<
+    { project: ProjectResponse; role: string }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchJoinedProjects = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/projects`, {
+          credentials: "include",
+        });
+        if (response.ok) {
+          const allProjects: ProjectResponse[] = await response.json();
+          const joined: { project: ProjectResponse; role: string }[] = [];
+
+          allProjects.forEach((project) => {
+            if (project.founderID === currentUserId) return; // Skip own projects
+
+            const memberRoles = project.memberRoles || {};
+            Object.entries(memberRoles).forEach(([roleName, member]) => {
+              if (member && member.id === currentUserId) {
+                joined.push({ project, role: roleName });
+              }
+            });
+          });
+
+          setJoinedProjects(joined);
+        }
+      } catch (error) {
+        console.error("Failed to fetch joined projects:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (currentUserId > 0) {
+      fetchJoinedProjects();
+    }
+  }, [currentUserId]);
+
+  const allActivities = [
+    // Projects you created
+    ...userProjects.map((p) => ({
+      id: `created-${p.id}`,
+      type: "created_project" as const,
+      title: p.name,
+      description: p.description,
+      date: p.creationDate,
+      status: p.status,
+      memberCount: Object.values(p.memberRoles || {}).filter((m) => m !== null)
+        .length,
+      link: `/project/${p.id}`,
+    })),
+    // Projects you joined
+    ...joinedProjects.map((jp) => ({
+      id: `joined-${jp.project.id}-${jp.role}`,
+      type: "joined_project" as const,
+      title: jp.project.name,
+      description: jp.project.description,
+      date: jp.project.creationDate,
+      status: jp.project.status,
+      role: jp.role,
+      memberCount: Object.values(jp.project.memberRoles || {}).filter(
+        (m) => m !== null,
+      ).length,
+      link: `/project/${jp.project.id}`,
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-500"></div>
+      </div>
+    );
+  }
+
+  if (allActivities.length === 0) {
+    return (
+      <div className="bg-gray-900/30 rounded-2xl p-12 text-center border border-gray-800">
+        <Clock className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+        <h3 className="text-xl font-bold mb-2">No recent activity</h3>
+        <p className="text-gray-400">
+          Activity will appear here as you interact with other musicians
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {allActivities.map((activity) => (
+        <div
+          key={activity.id}
+          className="bg-gray-900/50 rounded-xl p-5 border border-gray-800 hover:border-amber-500/30 transition cursor-pointer"
+          onClick={() => navigate(activity.link)}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className={`p-2 rounded-lg flex-shrink-0 mt-1 ${
+                activity.type === "created_project"
+                  ? "bg-green-500/20"
+                  : "bg-purple-500/20"
+              }`}
+            >
+              {activity.type === "created_project" ? (
+                <FolderOpen className="h-5 w-5 text-green-400" />
+              ) : (
+                <Users className="h-5 w-5 text-purple-400" />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                {activity.type === "created_project" ? (
+                  <span className="text-xs bg-green-900/30 text-green-400 px-2 py-0.5 rounded-full">
+                    Created
+                  </span>
+                ) : (
+                  <span className="text-xs bg-purple-900/30 text-purple-400 px-2 py-0.5 rounded-full">
+                    Joined as {activity.role}
+                  </span>
+                )}
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs capitalize ${
+                    activity.status === "active"
+                      ? "bg-green-900/30 text-green-400"
+                      : activity.status === "recruiting"
+                        ? "bg-blue-900/30 text-blue-400"
+                        : "bg-yellow-900/30 text-yellow-400"
+                  }`}
+                >
+                  {activity.status}
+                </span>
+              </div>
+
+              <h3 className="font-bold text-lg text-amber-400">
+                {activity.title}
+              </h3>
+              {activity.description && (
+                <p className="text-gray-400 text-sm mt-1 line-clamp-2">
+                  {activity.description}
+                </p>
+              )}
+
+              <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  {activity.memberCount} member
+                  {activity.memberCount !== 1 ? "s" : ""}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(activity.date).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
