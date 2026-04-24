@@ -40,12 +40,9 @@ export function useAuth() {
   };
 
   const register = async (email: string, password: string, confirmPassword: string) => {
-    console.log('📝 Registering user...');
     const userData = await authAPI.register(email, password, confirmPassword);
-    console.log('✅ Registration API response:', userData);
     setUser(userData);
     setIsAuthenticated(true);
-    console.log('✅ Auth state updated - user:', userData, 'isAuthenticated:', true);
     return userData;
   };
 
@@ -53,13 +50,11 @@ export function useAuth() {
     console.log('🚪 Logging out...');
     try {
       await authAPI.logout();
-      console.log('✅ Logout API call successful');
     } catch (error) {
       console.error('❌ Logout API call failed:', error);
     }
     setUser(null);
     setIsAuthenticated(false);
-    console.log('✅ Auth state cleared - user:', null, 'isAuthenticated:', false);
   };
 
   return {

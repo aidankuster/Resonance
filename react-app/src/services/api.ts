@@ -67,7 +67,6 @@ export const searchAPI = {
     if (filters.genre) params.append('genre', filters.genre);
     if (filters.experienceLevel) params.append('experienceLevel', filters.experienceLevel);
     
-    console.log('🔍 Searching all with params:', params.toString());
     const response = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`);
     
     if (!response.ok) {
@@ -77,7 +76,6 @@ export const searchAPI = {
     }
     
     const data = await response.json();
-    console.log(`✅ Search results: ${data.users?.length || 0} users, ${data.projects?.length || 0} projects`);
     return data;
   },
   
@@ -90,7 +88,6 @@ export const searchAPI = {
     if (filters.experienceLevel) params.append('experienceLevel', filters.experienceLevel);
     params.append('type', 'users');
     
-    console.log('🔍 Searching users with params:', params.toString());
     const response = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`);
     
     if (!response.ok) {
@@ -100,7 +97,6 @@ export const searchAPI = {
     }
     
     const data = await response.json();
-    console.log(`✅ User search results: ${data.users?.length || 0} users`);
     return data.users || [];
   },
   
@@ -112,7 +108,6 @@ export const searchAPI = {
     if (filters.genre) params.append('genre', filters.genre);
     params.append('type', 'projects');
     
-    console.log('🔍 Searching projects with params:', params.toString());
     const response = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`);
     
     if (!response.ok) {
@@ -122,7 +117,6 @@ export const searchAPI = {
     }
     
     const data = await response.json();
-    console.log(`✅ Project search results: ${data.projects?.length || 0} projects`);
     return data.projects || [];
   }
 };
@@ -134,7 +128,6 @@ const getAuthHeaders = (): HeadersInit => {
 
 // Generic fetch wrapper for JSON responses
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  console.log(`📡 Fetching ${endpoint}...`);
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     credentials: 'include', // Include cookies for session-based auth
     headers: {
@@ -151,17 +144,11 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
   }
 
   const data = await response.json();
-  console.log(`✅ ${endpoint} responded successfully`);
   return data;
 }
 
 // For requests that don't need JSON headers (like FormData)
 async function fetchFormData<T>(endpoint: string, formData: FormData, method: string = 'POST'): Promise<T> {
-  console.log(`📡 Sending FormData to ${endpoint}...`);
-  // Log form data contents for debugging
-  for (let pair of formData.entries()) {
-    console.log(`   FormData: ${pair[0]} = ${pair[1] instanceof File ? `File: ${pair[1].name}` : pair[1]}`);
-  }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method,
@@ -195,7 +182,6 @@ export const instrumentsAPI = {
 export const profileAPI = {
   // Fetch profile for logged-in user
   getCurrentUserProfile: async (userId: number): Promise<ProfileResponse> => {
-    console.log(`📡 Fetching profile for user ID: ${userId}`);
     const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
       credentials: 'include', // Include cookies for session-based auth
       headers: getAuthHeaders(),
@@ -206,19 +192,16 @@ export const profileAPI = {
       throw new Error(`Failed to fetch profile (${response.status}): ${errorText}`);
     }
     const data = await response.json();
-    console.log(`✅ Profile loaded for user: ${data.info?.displayName}`);
     return data;
   },
   
   // Update profile after registration
   updateProfile: async (userId: number, formData: FormData): Promise<any> => {
-    console.log(`📡 Updating profile for user ID: ${userId}`);
     return fetchFormData(`/api/profile/${userId}`, formData, 'POST');
   },
 
   // Upload profile picture (uses session, no userId needed)
   uploadProfilePicture: async (file: File): Promise<void> => {
-    console.log(`📡 Uploading profile picture`);
     const formData = new FormData();
     formData.append('profile_picture', file);
 
@@ -235,7 +218,6 @@ export const profileAPI = {
       throw new Error(`Failed to upload profile picture (${response.status}): ${errorText}`);
     }
 
-    console.log(`✅ Profile picture uploaded successfully`);
   },
 
   // Get profile picture URL (always .jpg)
@@ -247,14 +229,12 @@ export const profileAPI = {
 // Authentication
 export const authAPI = {
   login: async (email: string, password: string): Promise<ProfileResponse> => {
-    console.log(`🔐 Attempting login for email: ${email}`);
     const formData = new FormData();
     formData.append('email', email);
     formData.append('password', password);
 
     try {
       const data = await fetchFormData<ProfileResponse>('/api/login', formData, 'POST');
-      console.log(`✅ Login successful for user ID: ${data.id}`);
       return data;
     } catch (error: any) {
       console.error('❌ Login failed:', error.message);
@@ -263,7 +243,6 @@ export const authAPI = {
   },
 
   register: async (email: string, password: string, confirmPassword: string): Promise<ProfileResponse> => {
-    console.log(`📝 Registering new user with email: ${email}`);
     const formData = new FormData();
     formData.append('email', email);
     formData.append('password', password);
@@ -271,7 +250,6 @@ export const authAPI = {
 
     try {
       const data = await fetchFormData<ProfileResponse>('/api/register', formData, 'POST');
-      console.log(`✅ Registration successful for user ID: ${data.id}`);
       return data;
     } catch (error: any) {
       console.error('❌ Registration failed:', error.message);
@@ -281,14 +259,12 @@ export const authAPI = {
 
   // Check if user has an active session via cookie
   checkSession: async (): Promise<ProfileResponse | null> => {
-    console.log('🔍 Checking session...');
 
     try {
       // Use the session endpoint to verify cookie-based session
       const data = await fetchAPI<ProfileResponse>('/api/session', {
         method: 'GET',
       });
-      console.log('✅ Session valid for user:', data.id);
       return data;
     } catch (error) {
       console.error('❌ Session invalid or expired');
@@ -297,13 +273,11 @@ export const authAPI = {
   },
 
   logout: async (): Promise<void> => {
-    console.log('🚪 Logging out...');
     try {
       await fetch(`${API_BASE_URL}/api/logout`, {
         method: 'GET',
         credentials: 'include', // Include cookies
       });
-      console.log('✅ Logout endpoint called');
     } catch (error) {
       console.log('⚠️ Logout endpoint not available, clearing session locally');
     }
@@ -322,7 +296,6 @@ export interface AudioFileResponse {
 export const audioAPI = {
   // Upload an audio file
   uploadAudioFile: async (file: File): Promise<AudioFileResponse> => {
-    console.log(`📡 Uploading audio file: ${file.name}`);
     const formData = new FormData();
     formData.append('audio_file', file);
 
@@ -340,19 +313,16 @@ export const audioAPI = {
     }
 
     const data = await response.json();
-    console.log(`✅ Audio file uploaded successfully: ${data.uuid}`);
     return data;
   },
 
   // Get all audio files for current user
   getUserAudioFiles: async (): Promise<AudioFileResponse[]> => {
-    console.log(`📡 Fetching user audio files`);
     return fetchAPI<AudioFileResponse[]>('/api/audio');
   },
 
   // Delete an audio file
   deleteAudioFile: async (uuid: string): Promise<void> => {
-    console.log(`📡 Deleting audio file: ${uuid}`);
     const response = await fetch(`${API_BASE_URL}/api/audio/${uuid}`, {
       method: 'DELETE',
       credentials: 'include',
@@ -364,8 +334,6 @@ export const audioAPI = {
       console.error(`❌ Failed to delete audio file:`, response.status, errorText);
       throw new Error(`Failed to delete audio file (${response.status}): ${errorText}`);
     }
-
-    console.log(`✅ Audio file deleted successfully`);
   },
 
   // Get audio file URL for playback

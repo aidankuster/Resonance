@@ -144,11 +144,8 @@ function Dashboard() {
           return;
         }
 
-        console.log("📡 Fetching profile for ID:", user.id);
         const profileData: BackendProfileResponse =
           await profileAPI.getCurrentUserProfile(user.id);
-
-        console.log("✅ Profile data received:", profileData);
 
         // Set admin status
         setIsAdmin(profileData.admin || false);
@@ -248,8 +245,6 @@ function Dashboard() {
   // Fetch platform statistics
   const fetchPlatformStats = async () => {
     try {
-      console.log("📊 Fetching platform statistics...");
-
       // Fetch all users to get total count
       const allUsers = await searchAPI.searchUsers({});
       const totalMusicians = allUsers.length;
@@ -269,10 +264,6 @@ function Dashboard() {
         activeMusicians: totalMusicians,
         activeProjects: totalProjects,
       });
-
-      console.log(
-        `✅ Platform stats: ${totalMusicians} musicians, ${totalProjects} projects`,
-      );
     } catch (error) {
       console.error("❌ Failed to fetch platform stats:", error);
     }
@@ -286,8 +277,6 @@ function Dashboard() {
   ) => {
     setLoadingMusicians(true);
     try {
-      console.log("🔍 Fetching discoverable musicians...");
-
       let allUsers: SearchResultUser[] = [];
 
       if (userInstruments.length > 0) {
@@ -326,9 +315,6 @@ function Dashboard() {
         .filter((musician) => musician.id !== currentUserId)
         .slice(0, 6);
 
-      console.log(
-        `✅ Found ${filteredUsers.length} discoverable musicians (excluding self)`,
-      );
       setSuggestedMusicians(filteredUsers);
     } catch (error) {
       console.error("❌ Failed to fetch discoverable musicians:", error);
@@ -342,8 +328,6 @@ function Dashboard() {
   const fetchUserProjects = async (userId: number) => {
     setLoadingProjects(true);
     try {
-      console.log("🔍 Fetching projects for user ID:", userId);
-
       const response = await fetch(`/api/projects?founderId=${userId}`, {
         credentials: "include",
       });
@@ -353,7 +337,6 @@ function Dashboard() {
       }
 
       const projects: ProjectResponse[] = await response.json();
-      console.log(`✅ Found ${projects.length} projects for user`);
       setUserProjects(projects);
     } catch (error) {
       console.error("❌ Failed to fetch user projects:", error);
