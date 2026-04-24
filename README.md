@@ -7,7 +7,7 @@ Languages & Tools:
 ![Static Badge](https://img.shields.io/badge/Lucide_Icons-red)
 
 Resonance Landing Page - Learn about the application and create your own account
-<img width="1920" height="883" alt="Screenshot (358)" src="https://github.com/user-attachments/assets/93334e2d-ab94-4f84-9592-cf8cf4d0d1bf" />
+<img width="1920" height="903" alt="Screenshot (438)" src="https://github.com/user-attachments/assets/432e7290-5fbf-4d82-a022-cf744eb57a85" />
 
-Resonance User Dashboard - View profiles of other users on the platform, create new projects, collaborate
-<img width="1920" height="907" alt="Screenshot (356)" src="https://github.com/user-attachments/assets/eb50f0fd-8470-410c-81b3-ca37a9f2cb1f" />
+Resonance User Dashboard - View profiles of other users on the platform, create new projects, and collaborate
+<img width="1920" height="896" alt="Screenshot (437)" src="https://github.com/user-attachments/assets/8107d81c-009c-4c52-8286-37f46112a6c3" />
