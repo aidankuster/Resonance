@@ -1,6 +1,7 @@
 package com.resonance.server.database;
 
 import com.resonance.server.config.ConfigProvider;
+import com.resonance.server.data.Announcement;
 import com.resonance.server.data.AudioFile;
 import com.resonance.server.data.Project;
 import com.resonance.server.data.Report;
@@ -685,7 +686,195 @@ public class DatabaseManager implements AutoCloseable {
 						.where(field("uuid").eq(inline(uuid, String.class))))
 				.then();
 	}
-
+	
+	// application methods
+	
+	public Mono<Application> createApplication(int projectId, String roleName, int applicantId, String message) {
+		return Mono.from(
+						   this.dsl.insertInto(table("project_applications"))
+								   .columns(
+										   field("project_id"),
+										   field("role_name"),
+										   field("applicant_id"),
+										   field("message"),
+										   field("status"))
+								   .values(
+										   inline(projectId, Integer.class),
+										   inline(roleName, String.class),
+										   inline(applicantId, Integer.class),
+										   inline(message, String.class),
+										   inline("PENDING", String.class)))
+				   .flatMap(i -> {
+					   if (i <= 0) {
+						   return Mono.error(new Exception("Failed to create application"));
+					   }
+					   return getApplicationByDetails(projectId, roleName, applicantId);
+				   });
+	}
+	
+	// Get applications for a project (founder only)
+	public Flux<Application> getProjectApplications(int projectId) {
+		return Flux.from(
+						   this.dsl.selectFrom(table("project_applications"))
+								   .where(field("project_id", Integer.class).eq(inline(projectId, Integer.class)))
+								   .orderBy(field("application_date").desc()))
+				   .map(this::mapToApplication);
+	}
+	
+	// Get applications by applicant
+	public Flux<Application> getUserApplications(int userId) {
+		return Flux.from(
+						   this.dsl.selectFrom(table("project_applications"))
+								   .where(field("applicant_id", Integer.class).eq(inline(userId, Integer.class)))
+								   .orderBy(field("application_date").desc()))
+				   .map(this::mapToApplication);
+	}
+	
+	// Update application status
+	public Mono<Application> updateApplicationStatus(int applicationId, String status) {
+		return Mono.from(
+						   this.dsl.update(table("project_applications"))
+								   .set(field("status"), inline(status, String.class))
+								   .set(field("response_date"), inline(new Timestamp(System.currentTimeMillis()), Timestamp.class))
+								   .where(field("application_id", Integer.class).eq(inline(applicationId, Integer.class))))
+				   .flatMap(i -> {
+					   if (i <= 0) {
+						   return Mono.error(new Exception("Failed to update application"));
+					   }
+					   return getApplication(applicationId);
+				   });
+	}
+	
+	// Accept application and fill role
+	public Mono<Project> acceptApplication(int applicationId) {
+		return getApplication(applicationId).flatMap(app -> getProject(app.projectId()).flatMap(project -> {
+			// Verify role is still open
+			boolean roleOpen = Arrays.stream(project.memberRoles())
+									 .anyMatch(r -> r.roleName().equals(app.roleName()) && r.account() == null);
+			
+			if (!roleOpen) {
+				return Mono.error(new Exception("Role is no longer available"));
+			}
+			
+			// Update application status
+			return updateApplicationStatus(applicationId, "ACCEPTED").flatMap(updatedApp -> {
+				// Fill the role
+				Project.Mutable mutable = project.mutable();
+				mutable.getMemberRoles().removeIf(r -> r.roleName().equals(app.roleName()));
+				
+				return findAccount(app.applicantId()).flatMap(applicant -> {
+					mutable.getMemberRoles().add(new Project.MemberRole(
+							project.id(),
+							applicant,
+							app.roleName(),
+							"Filled by " + applicant.info().displayName()));
+					
+					return updateProject(mutable.build());
+				});
+			});
+		}));
+	}
+	
+	private Mono<Application> getApplication(int applicationId) {
+		return Mono.from(
+						   this.dsl.selectFrom(table("project_applications"))
+								   .where(field("application_id", Integer.class).eq(inline(applicationId, Integer.class))))
+				   .map(this::mapToApplication);
+	}
+	
+	private Mono<Application> getApplicationByDetails(int projectId, String roleName, int applicantId) {
+		return Mono.from(
+						   this.dsl.selectFrom(table("project_applications"))
+								   .where(field("project_id", Integer.class).eq(inline(projectId, Integer.class)))
+								   .and(field("role_name", String.class).eq(inline(roleName, String.class)))
+								   .and(field("applicant_id", Integer.class).eq(inline(applicantId, Integer.class))))
+				   .map(this::mapToApplication);
+	}
+	
+	private Application mapToApplication(Record record) {
+		return new Application(
+				record.get(field("application_id", Integer.class)),
+				record.get(field("project_id", Integer.class)),
+				record.get(field("role_name", String.class)),
+				record.get(field("applicant_id", Integer.class)),
+				Application.ApplicationStatus.valueOf(record.get(field("status", String.class))),
+				record.get(field("message", String.class)),
+				record.get(field("application_date", Timestamp.class)),
+				record.get(field("response_date", Timestamp.class)));
+	}
+	
+	// ==================== ANNOUNCEMENT METHODS ====================
+	
+	public Mono<Announcement> createAnnouncement(int posterId, String subject, String content) {
+		final Timestamp timestamp = Timestamp.from(Instant.now());
+		return Mono.from(
+						   this.dsl.insertInto(table("announcements"))
+								   .columns(
+										   field("poster_id"),
+										   field("subject"),
+										   field("content"),
+										   field("date"))
+								   .values(
+										   inline(posterId, Integer.class),
+										   inline(subject, String.class),
+										   inline(content, String.class),
+										   inline(timestamp, Timestamp.class)))
+				   .flatMap(i -> {
+					   if (i <= 0) {
+						   return Mono.error(new Exception("Failed to create announcement"));
+					   }
+					   
+					   // Get the last inserted ID
+					   return Mono.from(this.dsl.select(field("LAST_INSERT_ID()", Integer.class)))
+								  .flatMap(record -> {
+									  final int announcementId = record.get(0, Integer.class);
+									  return getAnnouncement(announcementId);
+								  });
+				   });
+	}
+	
+	/**
+	 * Get a single announcement by ID
+	 */
+	public Mono<Announcement> getAnnouncement(int id) {
+		final Condition condition = field("announcement_id", Integer.class).eq(inline(id, Integer.class));
+		return this.getAnnouncements(condition).next();
+	}
+	
+	/**
+	 * Get all announcements, ordered by most recent first
+	 */
+	public Flux<Announcement> getAnnouncements() {
+		return this.getAnnouncements(DSL.trueCondition());
+	}
+	
+	/**
+	 * Get announcements with optional conditions
+	 */
+	public Flux<Announcement> getAnnouncements(Condition... conditions) {
+		return Flux.from(
+						   this.dsl.selectFrom(table("announcements"))
+								   .where(conditions)
+								   .orderBy(field("date").desc()))
+				   .map(record -> {
+					   final int id = record.get(field("announcement_id", Integer.class));
+					   final int posterId = record.get(field("poster_id", Integer.class));
+					   final String subject = record.get(field("subject", String.class));
+					   final String content = record.get(field("content", String.class));
+					   final Timestamp date = record.get(field("date", Timestamp.class));
+					   
+					   return new Announcement(id, posterId, subject, content, date);
+				   });
+	}
+	
+	public Mono<Void> deleteAnnouncement(int announcementId) {
+		return Mono.from(
+						   this.dsl.deleteFrom(table("announcements"))
+								   .where(field("announcement_id", Integer.class).eq(inline(announcementId, Integer.class))))
+				   .then();
+	}
+	
+	
 	// ==================== TABLE INITIALIZATION ====================
 
 	private boolean initializeDefaultTables(DSLContext dsl) {
@@ -863,6 +1052,24 @@ public class DatabaseManager implements AutoCloseable {
 			LOGGER.info("Created project_applications table");
 		}
 
+		if (!existingTables.contains("announcements")) {
+			dsl.createTable("announcements")
+					.column("announcement_id", SQLDataType.INTEGER.identity(true))
+					.column("poster_id", SQLDataType.INTEGER.notNull())
+					.column("subject", SQLDataType.VARCHAR(255).notNull())
+					.column("content", SQLDataType.CLOB.notNull())
+					.column("date", SQLDataType.TIMESTAMP.defaultValue(currentTimestamp()))
+					.constraints(
+							primaryKey("announcement_id"),
+							constraint("fk_announcement_poster_id")
+									.foreignKey("poster_id")
+									.references("user_account", "account_id")
+									.onDeleteCascade())
+					.execute();
+			created = true;
+			LOGGER.info("Created announcements table");
+		}
+
 		return created;
 	}
 
@@ -900,121 +1107,8 @@ public class DatabaseManager implements AutoCloseable {
 		}
 	}
 
-	public Mono<Application> createApplication(int projectId, String roleName, int applicantId, String message) {
-		return Mono.from(
-				this.dsl.insertInto(table("project_applications"))
-						.columns(
-								field("project_id"),
-								field("role_name"),
-								field("applicant_id"),
-								field("message"),
-								field("status"))
-						.values(
-								inline(projectId, Integer.class),
-								inline(roleName, String.class),
-								inline(applicantId, Integer.class),
-								inline(message, String.class),
-								inline("PENDING", String.class)))
-				.flatMap(i -> {
-					if (i <= 0) {
-						return Mono.error(new Exception("Failed to create application"));
-					}
-					return getApplicationByDetails(projectId, roleName, applicantId);
-				});
-	}
-
-	// Get applications for a project (founder only)
-	public Flux<Application> getProjectApplications(int projectId) {
-		return Flux.from(
-				this.dsl.selectFrom(table("project_applications"))
-						.where(field("project_id", Integer.class).eq(inline(projectId, Integer.class)))
-						.orderBy(field("application_date").desc()))
-				.map(this::mapToApplication);
-	}
-
-	// Get applications by applicant
-	public Flux<Application> getUserApplications(int userId) {
-		return Flux.from(
-				this.dsl.selectFrom(table("project_applications"))
-						.where(field("applicant_id", Integer.class).eq(inline(userId, Integer.class)))
-						.orderBy(field("application_date").desc()))
-				.map(this::mapToApplication);
-	}
-
-	// Update application status
-	public Mono<Application> updateApplicationStatus(int applicationId, String status) {
-		return Mono.from(
-				this.dsl.update(table("project_applications"))
-						.set(field("status"), inline(status, String.class))
-						.set(field("response_date"), inline(new Timestamp(System.currentTimeMillis()), Timestamp.class))
-						.where(field("application_id", Integer.class).eq(inline(applicationId, Integer.class))))
-				.flatMap(i -> {
-					if (i <= 0) {
-						return Mono.error(new Exception("Failed to update application"));
-					}
-					return getApplication(applicationId);
-				});
-	}
-
-	// Accept application and fill role
-	public Mono<Project> acceptApplication(int applicationId) {
-		return getApplication(applicationId).flatMap(app -> getProject(app.projectId()).flatMap(project -> {
-			// Verify role is still open
-			boolean roleOpen = Arrays.stream(project.memberRoles())
-					.anyMatch(r -> r.roleName().equals(app.roleName()) && r.account() == null);
-
-			if (!roleOpen) {
-				return Mono.error(new Exception("Role is no longer available"));
-			}
-
-			// Update application status
-			return updateApplicationStatus(applicationId, "ACCEPTED").flatMap(updatedApp -> {
-				// Fill the role
-				Project.Mutable mutable = project.mutable();
-				mutable.getMemberRoles().removeIf(r -> r.roleName().equals(app.roleName()));
-
-				return findAccount(app.applicantId()).flatMap(applicant -> {
-					mutable.getMemberRoles().add(new Project.MemberRole(
-							project.id(),
-							applicant,
-							app.roleName(),
-							"Filled by " + applicant.info().displayName()));
-
-					return updateProject(mutable.build());
-				});
-			});
-		}));
-	}
-
-	private Mono<Application> getApplication(int applicationId) {
-		return Mono.from(
-				this.dsl.selectFrom(table("project_applications"))
-						.where(field("application_id", Integer.class).eq(inline(applicationId, Integer.class))))
-				.map(this::mapToApplication);
-	}
-
-	private Mono<Application> getApplicationByDetails(int projectId, String roleName, int applicantId) {
-		return Mono.from(
-				this.dsl.selectFrom(table("project_applications"))
-						.where(field("project_id", Integer.class).eq(inline(projectId, Integer.class)))
-						.and(field("role_name", String.class).eq(inline(roleName, String.class)))
-						.and(field("applicant_id", Integer.class).eq(inline(applicantId, Integer.class))))
-				.map(this::mapToApplication);
-	}
-
-	private Application mapToApplication(Record record) {
-		return new Application(
-				record.get(field("application_id", Integer.class)),
-				record.get(field("project_id", Integer.class)),
-				record.get(field("role_name", String.class)),
-				record.get(field("applicant_id", Integer.class)),
-				Application.ApplicationStatus.valueOf(record.get(field("status", String.class))),
-				record.get(field("message", String.class)),
-				record.get(field("application_date", Timestamp.class)),
-				record.get(field("response_date", Timestamp.class)));
-	}
-
 	public DatabaseConfig getConfig() {
 		return this.config;
 	}
+
 }
