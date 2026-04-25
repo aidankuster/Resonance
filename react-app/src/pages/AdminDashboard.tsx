@@ -376,12 +376,9 @@ function AdminDashboard() {
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <Link
             to="/dashboard"
-            className="flex items-center space-x-3 hover:opacity-80 transition"
+            className="flex items-center hover:opacity-80 transition"
           >
-            <Music className="h-8 w-8 text-amber-500" />
-            <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent">
-              Resonance
-            </span>
+            <img src="/logo-full.png" alt="Resonance" className="h-10" />
           </Link>
 
           <div className="flex items-center gap-4">

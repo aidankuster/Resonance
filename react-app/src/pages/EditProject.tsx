@@ -385,11 +385,8 @@ function EditProject() {
     <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white">
       {/* Navigation */}
       <nav className="container mx-auto px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center space-x-2">
-          <Music className="h-8 w-8 text-amber-500" />
-          <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent">
-            Resonance
-          </span>
+        <div className="flex items-center">
+          <img src="/logo-full.png" alt="Resonance" className="h-10" />
         </div>
         <button
           onClick={handleCancel}

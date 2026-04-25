@@ -206,11 +206,8 @@ function SearchResults() {
       {/* Top Navigation */}
       <header className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <Music className="h-8 w-8 text-amber-500" />
-            <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent">
-              Resonance
-            </span>
+          <div className="flex items-center">
+            <img src="/logo-full.png" alt="Resonance" className="h-10" />
           </div>
 
           <div className="flex-1 max-w-2xl mx-8">

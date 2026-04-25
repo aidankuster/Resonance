@@ -101,12 +101,9 @@ function App() {
             {/* Logo - Left */}
             <Link
               to="/"
-              className="flex items-center space-x-3 hover:opacity-80 transition"
+              className="flex items-center hover:opacity-80 transition"
             >
-              <Music className="h-8 w-8 text-amber-500" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent">
-                Resonance
-              </span>
+              <img src="/logo-full.png" alt="Resonance" className="h-10" />
             </Link>
 
             {/* Navigation Links - Center */}
@@ -271,9 +268,8 @@ function App() {
         <footer className="border-t border-gray-800/50 py-8 mt-10">
           <div className="container mx-auto px-6 text-center text-amber-400">
             <div className="flex flex-col md:flex-row justify-between items-center">
-              <div className="flex items-center space-x-2 mb-4 md:mb-0">
-                <Music className="h-6 w-6 text-amber-500" />
-                <span className="text-xl font-bold">Resonance</span>
+              <div className="flex items-center mb-4 md:mb-0">
+                <img src="/logo-full.png" alt="Resonance" className="h-8" />
               </div>
               <div className="text-sm text-gray-400">
                 © 2026 Resonance Team • UNCP Music Department
