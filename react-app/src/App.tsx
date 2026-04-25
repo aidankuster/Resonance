@@ -9,6 +9,7 @@ import UserProfile from "./pages/UserProfile";
 import ProjectProfile from "./pages/ProjectProfile";
 import EditProject from "./pages/EditProject";
 import AdminDashboard from "./pages/AdminDashboard";
+import ChangePassword from "./pages/ChangePassword";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/project/:id" element={<ProjectProfile />} />
         <Route path="/project/:id/edit" element={<EditProject />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/change-password" element={<ChangePassword />} />
       </Routes>
     </Router>
   );

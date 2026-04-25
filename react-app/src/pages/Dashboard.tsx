@@ -1090,6 +1090,8 @@ function Dashboard() {
             {activeTab === "settings" && (
               <div className="space-y-8">
                 <h2 className="text-2xl font-bold">Settings</h2>
+
+                {/* Profile Settings */}
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h3 className="font-bold text-lg mb-6">Profile Settings</h3>
                   <button
@@ -1100,6 +1102,17 @@ function Dashboard() {
                     className="w-full bg-amber-600 hover:bg-amber-700 py-3 rounded-full font-medium transition"
                   >
                     Edit Profile
+                  </button>
+                </div>
+
+                {/* Account Security */}
+                <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
+                  <h3 className="font-bold text-lg mb-6">Account Security</h3>
+                  <button
+                    onClick={() => navigate("/change-password")}
+                    className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-full font-medium transition"
+                  >
+                    Change Password
                   </button>
                 </div>
               </div>

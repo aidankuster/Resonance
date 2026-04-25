@@ -15,10 +15,10 @@ import java.util.regex.Pattern;
 import static io.javalin.apibuilder.ApiBuilder.*;
 
 public class RegisterEndpoint implements EndpointGroup {
-
-	private static final Pattern EMAIL_REGEX = Pattern.compile("^[^\\s@]+@uncp\\.edu$");
-	private static final Pattern EMAIL_REGEX2 = Pattern.compile("^[^\\s@]+@bravemail\\.uncp\\.edu$");
-	private static final Pattern PASSWORD_REGEX = Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
+	
+	public static final Pattern EMAIL_REGEX = Pattern.compile("^[^\\s@]+@uncp\\.edu$");
+	public static final Pattern EMAIL_REGEX2 = Pattern.compile("^[^\\s@]+@bravemail\\.uncp\\.edu$");
+	public static final Pattern PASSWORD_REGEX = Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
 
 	@Override
 	public void addEndpoints() {

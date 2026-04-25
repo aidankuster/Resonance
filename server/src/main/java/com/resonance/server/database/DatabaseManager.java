@@ -197,6 +197,14 @@ public class DatabaseManager implements AutoCloseable {
 		return this.getAccounts(condition).next()
 				.doOnError(e -> LOGGER.warn("Unable to find account with email {}", emailAddress, e));
 	}
+	
+	public Mono<Void> changeAccountPassword(int accountId, String newHashedPassword) {
+		return Mono.from(
+				this.dsl.update(table("user_account"))
+						.set(field("password"), inline(newHashedPassword, String.class))
+						.where(field("account_id").eq(inline(accountId, Integer.class))))
+				.then();
+	}
 
 	public Flux<UserAccount> getAccounts() {
 		final Condition condition = field("account_id").isNotNull();

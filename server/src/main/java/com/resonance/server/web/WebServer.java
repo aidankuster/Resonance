@@ -87,6 +87,7 @@ public class WebServer implements AutoCloseable {
 		this.endpoints.add(new LoginEndpoint());
 		this.endpoints.add(new LogoutEndpoint());
 		this.endpoints.add(new SessionEndpoint());
+		this.endpoints.add(new PasswordChangeEndpoint());
 
 		// Data endpoints
 		this.endpoints.add(new GenresEndpoint());

@@ -281,6 +281,27 @@ export const authAPI = {
     } catch (error) {
       console.log('⚠️ Logout endpoint not available, clearing session locally');
     }
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string, confirmPassword: string): Promise<void> => {
+    const formData = new URLSearchParams();
+    formData.append('currentPassword', currentPassword);
+    formData.append('newPassword', newPassword);
+    formData.append('confirmPassword', confirmPassword);
+
+    const response = await fetch(`${API_BASE_URL}/api/password/change`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to change password');
+    }
   }
 };
 
