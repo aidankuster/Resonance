@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import reactor.core.Exceptions;
 
 import java.util.List;
+import java.sql.Date;
 
 import static io.javalin.apibuilder.ApiBuilder.*;
 
@@ -34,7 +35,7 @@ public class AnnouncementEndpoint implements EndpointGroup {
             delete("/{announcementId}", this::deleteAnnouncement);
         });
     }
-    
+
     private void getAnnouncements(@NotNull Context ctx) {
         try {
             final List<Announcement> announcements = Server.INSTANCE.getDatabaseManager()
@@ -67,7 +68,7 @@ public class AnnouncementEndpoint implements EndpointGroup {
      */
     private void createAnnouncement(@NotNull Context ctx) {
         final UserAccount account = Server.INSTANCE.getWebServer().getSessionHandler().validateSession(ctx);
-        
+
         if (!account.admin()) {
             throw new ForbiddenResponse("Admin access required");
         }
@@ -75,6 +76,8 @@ public class AnnouncementEndpoint implements EndpointGroup {
         try {
             final String subject = ctx.formParam("subject");
             final String content = ctx.formParam("content");
+            final String link = ctx.formParam("link");
+            final String eventDateStr = ctx.formParam("eventDate");
 
             if (subject == null || subject.trim().isEmpty()) {
                 throw new BadRequestResponse("Subject cannot be empty");
@@ -84,9 +87,14 @@ public class AnnouncementEndpoint implements EndpointGroup {
                 throw new BadRequestResponse("Content cannot be empty");
             }
 
+            Date eventDate = null;
+            if (eventDateStr != null && !eventDateStr.isBlank()) {
+                eventDate = Date.valueOf(eventDateStr); // Expects "YYYY-MM-DD" format
+            }
+
             // Create announcement
             final Announcement announcement = Server.INSTANCE.getDatabaseManager()
-                    .createAnnouncement(account.id(), subject.trim(), content.trim())
+                    .createAnnouncement(account.id(), subject.trim(), content.trim(), link, eventDate)
                     .block();
 
             if (announcement == null) {

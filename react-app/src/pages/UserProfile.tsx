@@ -81,6 +81,11 @@ function UserProfile() {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // reports
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+
   useEffect(() => {
     const loadProfiles = async () => {
       try {
@@ -268,6 +273,36 @@ function UserProfile() {
       });
     } catch {
       return "Unknown date";
+    }
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportReason.trim() || !profile) return;
+
+    setReportSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append("account_id", profile.id.toString());
+      formData.append("reason", reportReason);
+
+      const response = await fetch("/api/reports", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit report");
+      }
+
+      alert("Report submitted successfully. An admin will review it.");
+      setShowReportModal(false);
+      setReportReason("");
+    } catch (error) {
+      console.error("Failed to submit report:", error);
+      alert("Failed to submit report. Please try again.");
+    } finally {
+      setReportSubmitting(false);
     }
   };
 
@@ -578,7 +613,11 @@ function UserProfile() {
                       >
                         <Share2 className="h-5 w-5" />
                       </button>
-                      <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
+                      <button
+                        onClick={() => setShowReportModal(true)}
+                        className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition"
+                        title="Report user"
+                      >
                         <Flag className="h-5 w-5" />
                       </button>
                     </>
@@ -1052,6 +1091,73 @@ function UserProfile() {
           </div>
         </div>
       </div>
+      {/* Report Modal */}
+      {showReportModal && profile && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 border border-red-800/30">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-900/30 p-3 rounded-full">
+                <Flag className="h-6 w-6 text-red-400" />
+              </div>
+              <h2 className="text-2xl font-bold">Report User</h2>
+            </div>
+
+            <p className="text-gray-400 mb-4">
+              You are reporting{" "}
+              <span className="font-semibold text-white">
+                {profile.info.displayName}
+              </span>
+            </p>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">
+                Reason for report *
+              </label>
+              <textarea
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                rows={4}
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-red-500 resize-none"
+                placeholder="Describe why you're reporting this user..."
+                maxLength={500}
+              />
+              <p className="text-xs text-gray-500 mt-1 text-right">
+                {reportReason.length}/500
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowReportModal(false);
+                  setReportReason("");
+                }}
+                className="flex-1 px-4 py-3 rounded-full border border-gray-700 hover:bg-gray-800 transition"
+                disabled={reportSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitReport}
+                disabled={!reportReason.trim() || reportSubmitting}
+                className="flex-1 bg-red-600 hover:bg-red-700 px-4 py-3 rounded-full font-medium transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {reportSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Flag className="h-4 w-4" />
+                    Submit Report
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
