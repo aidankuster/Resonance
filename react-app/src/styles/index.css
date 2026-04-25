@@ -325,3 +325,18 @@ a.bg-amber-700 {
   transform: rotate(30deg);
   animation: waveOuter 3s ease-in-out infinite;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

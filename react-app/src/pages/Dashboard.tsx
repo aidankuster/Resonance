@@ -103,6 +103,10 @@ function Dashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
+  // Flyer state
+  const [showFlyerModal, setShowFlyerModal] = useState(false);
+  const [flyerMessage, setFlyerMessage] = useState("");
+
   // Handle search submission
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,7 +367,12 @@ function Dashboard() {
   };
 
   const handleGenerateFlyer = () => {
-    console.log("Generate flyer clicked");
+    setFlyerMessage("");
+    setShowFlyerModal(true);
+  };
+
+  const handlePrintFlyer = () => {
+    window.print();
   };
 
   const handleManageAudio = () => {
@@ -374,7 +383,7 @@ function Dashboard() {
 
   const handleCopyProfileLink = () => {
     if (user?.id) {
-      const profileLink = `/profile/${user.id}`;
+      const profileLink = `http://localhost/profile/${user.id}`;
       navigator.clipboard
         .writeText(profileLink)
         .then(() => {
@@ -1170,6 +1179,235 @@ function Dashboard() {
           </aside>
         </div>
       </div>
+      {/* Flyer Generator Modal */}
+      {showFlyerModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-2xl p-8 max-w-lg w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Generate Flyer</h2>
+              <button
+                onClick={() => setShowFlyerModal(false)}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-gray-400 text-sm mb-4">
+              Add a custom message to your flyer to attract other musicians:
+            </p>
+
+            <div className="mb-6">
+              <input
+                type="text"
+                value={flyerMessage}
+                onChange={(e) => setFlyerMessage(e.target.value)}
+                placeholder='e.g., "Looking for a guitarist!" or "Available for jazz ensembles"'
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500"
+                maxLength={100}
+              />
+              <p className="text-xs text-gray-500 mt-1 text-right">
+                {flyerMessage.length}/100
+              </p>
+            </div>
+
+            {/* Flyer Preview */}
+            <div
+              className="bg-white text-black rounded-xl p-8 mb-6 flyer-content print-area"
+              id="flyer-content"
+              style={{ minHeight: "500px" }}
+            >
+              {/* Header */}
+              <div className="text-center border-b-2 border-amber-500 pb-6 mb-6">
+                <h2 className="text-3xl font-bold text-amber-600">Resonance</h2>
+                <p className="text-base text-gray-500">
+                  UNCP Music Collaboration Platform
+                </p>
+              </div>
+
+              {/* Profile Info */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="h-20 w-20 rounded-full bg-amber-500 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {user && (
+                    <img
+                      src={
+                        profileAPI.getProfilePictureUrl(user.id) +
+                        "?t=" +
+                        Date.now()
+                      }
+                      alt={userProfile.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold">{userProfile.name}</h3>
+                  <p className="text-amber-600 text-base">
+                    {userProfile.instrument}
+                  </p>
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="space-y-4 mb-6">
+                <div>
+                  <p className="text-sm text-gray-500 font-semibold">
+                    EXPERIENCE
+                  </p>
+                  <p className="text-lg">
+                    {formatExperienceLevel(userProfile.experienceLevel)}
+                  </p>
+                </div>
+                {/* instruments section */}
+                <div>
+                  <p className="text-sm text-gray-500 font-semibold">
+                    INSTRUMENTS
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {userProfile.instrument.split(", ").map((inst, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-sm"
+                      >
+                        {inst}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {userProfile.genres.length > 0 && (
+                  <div>
+                    <p className="text-sm text-gray-500 font-semibold">
+                      GENRES
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {userProfile.genres.map((genre, idx) => (
+                        <span
+                          key={idx}
+                          className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-sm"
+                        >
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-gray-500 font-semibold">EMAIL</p>
+                  <p className="text-lg text-amber-600">{userProfile.email}</p>
+                </div>
+              </div>
+
+              {/* Custom Message */}
+              {flyerMessage && (
+                <div className="bg-amber-100 border-2 border-amber-400 rounded-lg p-4 text-center mb-6">
+                  <p className="text-amber-800 font-bold text-xl">
+                    {flyerMessage}
+                  </p>
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="text-center border-t border-gray-300 pt-6">
+                <p className="text-base text-gray-500">
+                  Find me on Resonance - UNCP's music collaboration platform
+                </p>
+                <p className="text-base text-amber-600 font-medium mt-2">
+                  resonance.uncp.edu/profile/{user?.id}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowFlyerModal(false)}
+                className="flex-1 px-4 py-3 rounded-full border border-gray-700 hover:bg-gray-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const flyerContent =
+                    document.getElementById("flyer-content")?.innerHTML;
+                  const printWindow = window.open("", "_blank");
+                  if (printWindow && flyerContent) {
+                    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Resonance Flyer - ${userProfile.name}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @media print {
+              body { 
+                margin: 0; 
+                padding: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+              }
+              @page { 
+                size: letter; 
+                margin: 0.25in;
+              }
+              .flyer-container {
+                max-width: 100%;
+                width: 100%;
+                transform: scale(1);
+              }
+            }
+            body {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              background: white;
+            }
+            .flyer-container {
+              max-width: 650px;
+              width: 100%;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="flyer-container">
+            ${flyerContent}
+          </div>
+        </body>
+      </html>
+    `);
+                    printWindow.document.close();
+                    printWindow.focus();
+                    setTimeout(() => {
+                      printWindow.print();
+                      // Don't close window so user can see the result
+                    }, 500);
+                  }
+                }}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 px-4 py-3 rounded-full font-semibold transition flex items-center justify-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Print Flyer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

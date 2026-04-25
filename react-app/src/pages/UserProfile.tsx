@@ -364,6 +364,19 @@ function UserProfile() {
     return level.charAt(0) + level.slice(1).toLowerCase();
   };
 
+  const handleShareProfile = () => {
+    if (!profile) return;
+    const profileLink = `http://localhost/profile/${profile.id}`;
+    navigator.clipboard
+      .writeText(profileLink)
+      .then(() => {
+        alert("Profile link copied to clipboard!");
+      })
+      .catch(() => {
+        alert("Failed to copy link: " + profileLink);
+      });
+  };
+
   const getMessageLink = () => {
     if (!profile || !currentUserProfile) return "#";
 
@@ -558,7 +571,11 @@ function UserProfile() {
                   ) : null}
                   {isAuthenticated && !isOwnProfile && (
                     <>
-                      <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
+                      <button
+                        onClick={handleShareProfile}
+                        className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition"
+                        title="Copy profile link"
+                      >
                         <Share2 className="h-5 w-5" />
                       </button>
                       <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
