@@ -3,14 +3,11 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
-  ChevronLeft,
   User,
   Users,
   Calendar,
   Mail,
-  Heart,
   Share2,
-  Flag,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -23,7 +20,12 @@ import {
   FileText,
   X,
   Check,
+  Search,
+  Bell,
+  TrendingUp,
+  FolderOpen,
 } from "lucide-react";
+import { profileAPI } from "../services/api";
 
 // Define interface matching the actual backend response
 interface ProjectData {
@@ -63,6 +65,20 @@ interface Application {
   responseDate: string | null;
 }
 
+interface NotificationItem {
+  id: string;
+  type:
+    | "new_user"
+    | "new_project"
+    | "application"
+    | "project_update"
+    | "joined_project";
+  message: string;
+  link?: string;
+  time: string;
+  read: boolean;
+}
+
 function ProjectProfile() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -84,7 +100,19 @@ function ProjectProfile() {
   }>({});
   const currentUserId = user?.id || null;
 
-  // Derived state - declared ONCE here
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Nav bar user profile
+  const [navUserProfile, setNavUserProfile] = useState({
+    name: "",
+    instrument: "",
+  });
+
+  // Notification state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
   const isFounder = currentUserId === project?.founderID;
   const isMember = project
     ? Object.values(project.memberRoles || {}).some(
@@ -92,72 +120,107 @@ function ProjectProfile() {
       )
     : false;
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  // Close notifications when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".notification-area")) setShowNotifications(false);
+    };
+    if (showNotifications)
+      document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showNotifications]);
+
+  // Load current user for nav bar
+  useEffect(() => {
+    if (user) {
+      profileAPI
+        .getCurrentUserProfile(user.id)
+        .then((data) => {
+          setNavUserProfile({
+            name: data.info.displayName,
+            instrument:
+              data.instruments?.length > 0
+                ? data.instruments.join(", ")
+                : "No instruments",
+          });
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  // Generate notifications
+  useEffect(() => {
+    if (project) {
+      const items: NotificationItem[] = [];
+      if (applications.filter((a) => a.status === "PENDING").length > 0) {
+        items.push({
+          id: "pending-apps",
+          type: "application",
+          message: `${applications.filter((a) => a.status === "PENDING").length} pending application(s) for this project`,
+          time: "Now",
+          read: false,
+        });
+      }
+      setNotifications(items);
+    }
+  }, [project, applications]);
+
   useEffect(() => {
     const loadProject = async () => {
       try {
         setLoading(true);
         setError(null);
-
         if (!id) {
           setError("No project ID provided");
           return;
         }
-
-        console.log("Loading project with ID:", id);
-
         const response = await fetch(`/api/projects/${id}`);
-
         if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error("Project not found");
-          }
-          throw new Error(`Failed to load project: ${response.status}`);
+          throw new Error(
+            response.status === 404
+              ? "Project not found"
+              : `Failed to load project: ${response.status}`,
+          );
         }
-
-        const data = await response.json();
-        console.log("Raw project data:", data);
-        setProject(data);
+        setProject(await response.json());
       } catch (err) {
-        console.error("Failed to load project:", err);
         setError(err instanceof Error ? err.message : "Could not load project");
       } finally {
         setLoading(false);
       }
     };
-
     loadProject();
   }, [id]);
 
-  // Fetch applications if user is founder
   useEffect(() => {
     const fetchApplications = async () => {
       if (!project || !isFounder || !id) return;
-
       setLoadingApplications(true);
       try {
-        const response = await fetch(
-          `/api/projects/${id}/applications`,
-          { credentials: "include" },
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setApplications(data);
-        }
+        const response = await fetch(`/api/projects/${id}/applications`, {
+          credentials: "include",
+        });
+        if (response.ok) setApplications(await response.json());
       } catch (error) {
         console.error("Failed to fetch applications:", error);
       } finally {
         setLoadingApplications(false);
       }
     };
-
     fetchApplications();
   }, [project, id, isFounder]);
 
-  // Check if user has pending applications for roles
   useEffect(() => {
     const checkUserApplications = async () => {
       if (!currentUserId || !id || isFounder) return;
-
       try {
         const response = await fetch(
           `/api/applications?userId=${currentUserId}`,
@@ -167,9 +230,8 @@ function ProjectProfile() {
           const userApps: Application[] = await response.json();
           const pendingMap: { [key: string]: boolean } = {};
           userApps.forEach((app) => {
-            if (app.projectId === parseInt(id) && app.status === "PENDING") {
+            if (app.projectId === parseInt(id) && app.status === "PENDING")
               pendingMap[app.roleName] = true;
-            }
           });
           setHasPendingApplication(pendingMap);
         }
@@ -177,30 +239,15 @@ function ProjectProfile() {
         console.error("Failed to check user applications:", error);
       }
     };
-
     checkUserApplications();
   }, [currentUserId, id, isFounder]);
 
-  // Helper to get founder info
-  const getFounderInfo = () => {
-    if (!project?.memberRoles?.Founder) return null;
-    return project.memberRoles.Founder;
-  };
+  const getFounderInfo = () => project?.memberRoles?.Founder || null;
+  const getFounderName = () => getFounderInfo()?.info?.displayName || "Unknown";
+  const getFounderEmail = () => getFounderInfo()?.emailAddress || "";
 
-  const getFounderName = () => {
-    const founder = getFounderInfo();
-    return founder?.info?.displayName || "Unknown";
-  };
-
-  const getFounderEmail = () => {
-    const founder = getFounderInfo();
-    return founder?.emailAddress || "";
-  };
-
-  // Helper to convert memberRoles object to array for easier mapping
   const getMemberRolesArray = () => {
     if (!project?.memberRoles) return [];
-
     return Object.entries(project.memberRoles).map(([roleName, account]) => ({
       roleName,
       account,
@@ -208,17 +255,14 @@ function ProjectProfile() {
     }));
   };
 
-  const getOpenRoles = () => {
-    return getMemberRolesArray().filter(
+  const getOpenRoles = () =>
+    getMemberRolesArray().filter(
       (role) => !role.isFilled && role.roleName !== "Founder",
     );
-  };
-
-  const getFilledRoles = () => {
-    return getMemberRolesArray().filter(
+  const getFilledRoles = () =>
+    getMemberRolesArray().filter(
       (role) => role.isFilled && role.roleName !== "Founder",
     );
-  };
 
   const getStatusInfo = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -274,8 +318,7 @@ function ProjectProfile() {
   const formatDate = (dateString: string) => {
     if (!dateString) return "Unknown";
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
+      return new Date(dateString).toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
         day: "numeric",
@@ -288,9 +331,18 @@ function ProjectProfile() {
   const handleApply = (roleName: string) => {
     setSelectedRole(roleName);
     setApplicationMessage(
-      `Hi, I'm interested in the ${roleName} position for your project "${project?.name}". I'd love to collaborate with you!`,
+      `Hi, I'm interested in the ${roleName} position for your project "${project?.name}".`,
     );
     setShowApplyModal(true);
+  };
+
+  const handleShareProject = () => {
+    if (!project) return;
+    const projectLink = `http://localhost/project/${project.id}`;
+    navigator.clipboard
+      .writeText(projectLink)
+      .then(() => alert("Project link copied to clipboard!"))
+      .catch(() => alert("Failed to copy link: " + projectLink));
   };
 
   const handleSubmitApplication = async () => {
@@ -314,7 +366,6 @@ function ProjectProfile() {
         throw new Error(`Failed to submit application: ${errorText}`);
       }
 
-      // Update pending applications map
       setHasPendingApplication((prev) => ({
         ...prev,
         [selectedRole]: true,
@@ -353,7 +404,6 @@ function ProjectProfile() {
       const updatedProject = await response.json();
       setProject(updatedProject);
 
-      // Remove from applications list
       setApplications((prev) => prev.filter((app) => app.id !== applicationId));
 
       alert("Application accepted! The role has been filled.");
@@ -377,7 +427,6 @@ function ProjectProfile() {
         throw new Error("Failed to reject application");
       }
 
-      // Remove from applications list
       setApplications((prev) => prev.filter((app) => app.id !== applicationId));
 
       alert("Application rejected.");
@@ -390,6 +439,7 @@ function ProjectProfile() {
   const pendingApplicationsCount = applications.filter(
     (app) => app.status === "PENDING",
   ).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   if (loading) {
     return (
@@ -432,24 +482,67 @@ function ProjectProfile() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
+      {/* Top Navigation - Matching Dashboard.tsx */}
+      <header className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+          {/* Logo - Left */}
           <Link
             to="/dashboard"
             className="flex items-center hover:opacity-80 transition"
           >
             <img src="/logo-full.png" alt="Resonance" className="h-10" />
           </Link>
-          <button
-            onClick={() => navigate(-1)}
-            className="text-gray-400 hover:text-white flex items-center gap-2"
-          >
-            <ChevronLeft className="h-5 w-5" />
-            Back
-          </button>
+
+          {/* Search Bar - Center */}
+          <div className="flex-1 max-w-2xl mx-8">
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search musicians, projects, or ensembles..."
+                className="w-full bg-gray-800/50 border border-gray-700 rounded-full pl-12 pr-4 py-3 focus:outline-none focus:border-amber-500"
+              />
+            </form>
+          </div>
+
+          {/* Right Side - Name/Instruments, Profile Picture */}
+          <div className="flex items-center space-x-3">
+            <div className="text-right">
+              <p className="font-semibold">{navUserProfile.name}</p>
+              <p className="text-sm text-gray-400">
+                {navUserProfile.instrument}
+              </p>
+            </div>
+            <button
+              onClick={() => user?.id && navigate(`/profile/${user.id}`)}
+              className="relative cursor-pointer"
+            >
+              <div className="h-10 w-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center overflow-hidden">
+                {user && (
+                  <img
+                    src={profileAPI.getProfilePictureUrl(user.id)}
+                    alt={navUserProfile.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                      const p = e.currentTarget.parentElement;
+                      if (p) {
+                        const icon = document.createElement("div");
+                        icon.innerHTML =
+                          '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                        p.appendChild(icon.firstChild!);
+                      }
+                    }}
+                  />
+                )}
+              </div>
+              <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
+            </button>
+          </div>
         </div>
-      </nav>
+      </header>
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-8 max-w-6xl">
@@ -513,14 +606,12 @@ function ProjectProfile() {
                   Contact Founder
                 </a>
               )}
-              <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
-                <Heart className="h-5 w-5" />
-              </button>
-              <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
+              <button
+                onClick={handleShareProject}
+                className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition"
+                title="Copy project link"
+              >
                 <Share2 className="h-5 w-5" />
-              </button>
-              <button className="bg-gray-800 hover:bg-gray-700 px-4 py-3 rounded-full transition">
-                <Flag className="h-5 w-5" />
               </button>
             </div>
           </div>
@@ -1035,9 +1126,8 @@ function ProjectProfile() {
       <footer className="mt-20 border-t border-gray-800 py-8">
         <div className="container mx-auto px-6 text-center text-amber-400">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <Music className="h-6 w-6 text-amber-500" />
-              <span className="text-xl font-bold">Resonance</span>
+            <div className="mb-4 md:mb-0">
+              <img src="/logo-full.png" alt="Resonance" className="h-10" />
             </div>
             <div className="text-sm">
               © 2026 Resonance Team • UNCP Music Department

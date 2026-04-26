@@ -11,14 +11,18 @@ import {
   Volume2,
   Headphones,
   Award,
+  FileText,
   Tag,
   Star,
   Share2,
   Flag,
   Users,
+  TrendingUp,
   Camera,
   Play,
   Pause,
+  Search,
+  Bell,
 } from "lucide-react";
 import { profileAPI, audioAPI } from "../services/api";
 import type { AudioFileResponse } from "../services/api";
@@ -48,6 +52,16 @@ interface ProjectData {
   memberRoles: {
     [roleName: string]: any | null;
   };
+}
+
+// Notification type
+interface NotificationItem {
+  id: string;
+  type: "new_user" | "new_project" | "application" | "project_update";
+  message: string;
+  link?: string;
+  time: string;
+  read: boolean;
 }
 
 function UserProfile() {
@@ -86,6 +100,66 @@ function UserProfile() {
   const [reportReason, setReportReason] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // notifications
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  // User profile data for nav bar
+  const [navUserProfile, setNavUserProfile] = useState({
+    name: "",
+    instrument: "",
+  });
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".notification-area")) {
+        setShowNotifications(false);
+      }
+    };
+    if (showNotifications) {
+      document.addEventListener("click", handleClickOutside);
+    }
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showNotifications]);
+
+  useEffect(() => {
+    if (profile && currentUserProfile) {
+      const items: NotificationItem[] = [];
+      if (userProjects.length > 0) {
+        items.push({
+          id: "projects-count",
+          type: "project_update",
+          message: `You have ${userProjects.length} active project${userProjects.length !== 1 ? "s" : ""}`,
+          link: "/dashboard",
+          time: "Now",
+          read: false,
+        });
+      }
+      if (audioFiles.length > 0) {
+        items.push({
+          id: "audio-count",
+          type: "project_update",
+          message: `You have ${audioFiles.length} audio sample${audioFiles.length !== 1 ? "s" : ""} uploaded`,
+          link: "/dashboard",
+          time: "Now",
+          read: false,
+        });
+      }
+      setNotifications(items);
+    }
+  }, [userProjects, audioFiles]);
+
   useEffect(() => {
     const loadProfiles = async () => {
       try {
@@ -114,13 +188,21 @@ function UserProfile() {
           profileData.genres,
         );
 
-        // If user is authenticated, also load their own profile for comparison
+        // If user is authenticated, also load their own profile for nav bar
         if (isAuthenticated && user) {
           try {
             const currentUserData = await profileAPI.getCurrentUserProfile(
               user.id,
             );
             setCurrentUserProfile(currentUserData);
+            setNavUserProfile({
+              name: currentUserData.info.displayName,
+              instrument:
+                currentUserData.instruments &&
+                currentUserData.instruments.length > 0
+                  ? currentUserData.instruments.join(", ")
+                  : "No instruments",
+            });
           } catch (err) {
             console.error("Failed to load current user profile:", err);
           }
@@ -149,7 +231,6 @@ function UserProfile() {
   }, [id, isAuthenticated, user]);
 
   useEffect(() => {
-    // Load profile picture whenever profile changes
     if (profile) {
       setProfilePictureUrl(
         `${profileAPI.getProfilePictureUrl(profile.id)}?t=${Date.now()}`,
@@ -160,20 +241,14 @@ function UserProfile() {
   const loadAudioFiles = async (userId: number) => {
     setLoadingAudio(true);
     try {
-      // If viewing own profile, use the authenticated endpoint
       if (isOwnProfile) {
         const files = await audioAPI.getUserAudioFiles();
         setAudioFiles(files);
       } else {
-        // For public profiles, we need a public endpoint or we can fetch directly
-        // For now, try to fetch using the same endpoint (it may be restricted)
         try {
           const files = await audioAPI.getUserAudioFiles();
-          // Filter to only show files belonging to this user
-          // This assumes the API returns files with uploaderId
           setAudioFiles(files.filter((f: any) => f.uploaderId === userId));
         } catch {
-          // If not authenticated or endpoint restricted, show empty
           setAudioFiles([]);
         }
       }
@@ -186,19 +261,16 @@ function UserProfile() {
   };
 
   const handlePlayAudio = (uuid: string) => {
-    // Stop any currently playing audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
 
-    // If clicking the same audio that's playing, just stop it
     if (currentlyPlaying === uuid) {
       setCurrentlyPlaying(null);
       return;
     }
 
-    // Create and play new audio
     const audioUrl = audioAPI.getAudioFileUrl(uuid);
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
@@ -229,13 +301,11 @@ function UserProfile() {
     const file = event.target.files?.[0];
     if (!file || !profile) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       alert("Please select an image file");
       return;
     }
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert("File size must be less than 5MB");
       return;
@@ -244,8 +314,6 @@ function UserProfile() {
     try {
       setUploadingPicture(true);
       await profileAPI.uploadProfilePicture(file);
-
-      // Reload profile picture with cache-busting timestamp
       setProfilePictureUrl(
         `${profileAPI.getProfilePictureUrl(profile.id)}?t=${Date.now()}`,
       );
@@ -291,9 +359,7 @@ function UserProfile() {
         credentials: "include",
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to submit report");
-      }
+      if (!response.ok) throw new Error("Failed to submit report");
 
       alert("Report submitted successfully. An admin will review it.");
       setShowReportModal(false);
@@ -313,9 +379,8 @@ function UserProfile() {
         credentials: "include",
       });
 
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(`Failed to fetch projects: ${response.status}`);
-      }
 
       const projects: ProjectData[] = await response.json();
       setUserProjects(projects);
@@ -349,7 +414,6 @@ function UserProfile() {
   ) => {
     setLoadingSimilar(true);
     try {
-      // Search by the user's instruments
       let similar: any[] = [];
 
       if (instruments.length > 0) {
@@ -357,34 +421,27 @@ function UserProfile() {
           `/api/search?instrument=${encodeURIComponent(instruments[0])}&type=users`,
           { credentials: "include" },
         );
-
         if (instrumentResults.ok) {
           const data = await instrumentResults.json();
           similar = [...(data.users || [])];
         }
       }
 
-      // Also search by genre if we have few results
       if (genres.length > 0 && similar.length < 5) {
         const genreResults = await fetch(
           `/api/search?genre=${encodeURIComponent(genres[0])}&type=users`,
           { credentials: "include" },
         );
-
         if (genreResults.ok) {
           const data = await genreResults.json();
           const existingIds = new Set(similar.map((u: any) => u.id));
           (data.users || []).forEach((user: any) => {
-            if (!existingIds.has(user.id)) {
-              similar.push(user);
-            }
+            if (!existingIds.has(user.id)) similar.push(user);
           });
         }
       }
 
-      // Filter out the current user and limit to 5
       const filtered = similar.filter((u: any) => u.id !== userId).slice(0, 5);
-
       setSimilarMusicians(filtered);
     } catch (error) {
       console.error("Failed to fetch similar musicians:", error);
@@ -404,25 +461,18 @@ function UserProfile() {
     const profileLink = `http://localhost/profile/${profile.id}`;
     navigator.clipboard
       .writeText(profileLink)
-      .then(() => {
-        alert("Profile link copied to clipboard!");
-      })
-      .catch(() => {
-        alert("Failed to copy link: " + profileLink);
-      });
+      .then(() => alert("Profile link copied to clipboard!"))
+      .catch(() => alert("Failed to copy link: " + profileLink));
   };
 
   const getMessageLink = () => {
     if (!profile || !currentUserProfile) return "#";
 
     const senderName = currentUserProfile.info.displayName;
-
     const subject = `Resonance: Collaboration request from ${senderName}`;
-
     const senderInstruments = currentUserProfile.instruments?.length
       ? currentUserProfile.instruments.join(", ")
       : "Various instruments";
-
     const senderGenres = currentUserProfile.genres?.length
       ? currentUserProfile.genres.join(", ")
       : "Various genres";
@@ -436,15 +486,12 @@ function UserProfile() {
       `• Experience: ${formatExperienceLevel(currentUserProfile.info.experienceLevel)}\n\n` +
       `I think we could create some great music together! Would you be interested in connecting to discuss further?\n\n` +
       `Looking forward to hearing from you,\n` +
-      `${senderName}\n` +
-      `${currentUserProfile.emailAddress}\n\n` +
-      `---\n` +
-      `Sent via Resonance - UNCP Music Collaboration Platform`;
+      `${senderName}\n${currentUserProfile.emailAddress}\n\n` +
+      `---\nSent via Resonance - UNCP Music Collaboration Platform`;
 
     return `mailto:${profile.emailAddress}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
-  // Check if this is the current user's own profile
   const isOwnProfile =
     currentUserProfile && profile && currentUserProfile.id === profile.id;
 
@@ -483,36 +530,67 @@ function UserProfile() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
+      {/* Top Navigation */}
+      <header className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+          {/* Logo - Left - Links to Dashboard */}
           <Link
-            to="/"
+            to="/dashboard"
             className="flex items-center hover:opacity-80 transition"
           >
             <img src="/logo-full.png" alt="Resonance" className="h-10" />
           </Link>
 
-          {/* Dashboard link for authenticated users */}
-          {isAuthenticated && (
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="text-gray-400 hover:text-white flex items-center gap-2"
-            >
-              <Users className="h-5 w-5" />
-              Dashboard
-            </button>
-          )}
+          {/* Search Bar - Center */}
+          <div className="flex-1 max-w-2xl mx-8">
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search musicians, projects, or ensembles..."
+                className="w-full bg-gray-800/50 border border-gray-700 rounded-full pl-12 pr-4 py-3 focus:outline-none focus:border-amber-500"
+              />
+            </form>
+          </div>
 
-          <button
-            onClick={() => navigate(-1)}
-            className="text-gray-400 hover:text-white flex items-center gap-2"
-          >
-            <ChevronLeft className="h-5 w-5" />
-            Back
-          </button>
+          {/* Right Side - Name/Instruments, Profile Picture */}
+          <div className="flex items-center space-x-3">
+            <div className="text-right">
+              <p className="font-semibold">{navUserProfile.name}</p>
+              <p className="text-sm text-gray-400">
+                {navUserProfile.instrument}
+              </p>
+            </div>
+            <button
+              onClick={() => user?.id && navigate(`/profile/${user.id}`)}
+              className="relative cursor-pointer"
+            >
+              <div className="h-10 w-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center overflow-hidden">
+                {user && (
+                  <img
+                    src={profileAPI.getProfilePictureUrl(user.id)}
+                    alt={navUserProfile.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        const icon = document.createElement("div");
+                        icon.innerHTML =
+                          '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                        parent.appendChild(icon.firstChild!);
+                      }
+                    }}
+                  />
+                )}
+              </div>
+              <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
+            </button>
+          </div>
         </div>
-      </nav>
+      </header>
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-8 max-w-6xl">
@@ -660,31 +738,19 @@ function UserProfile() {
         <div className="flex gap-2 mb-6 border-b border-gray-800">
           <button
             onClick={() => setActiveTab("about")}
-            className={`px-6 py-3 font-medium transition relative ${
-              activeTab === "about"
-                ? "text-amber-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-amber-400"
-                : "text-gray-400 hover:text-white"
-            }`}
+            className={`px-6 py-3 font-medium transition relative ${activeTab === "about" ? "text-amber-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-amber-400" : "text-gray-400 hover:text-white"}`}
           >
             About
           </button>
           <button
             onClick={() => setActiveTab("projects")}
-            className={`px-6 py-3 font-medium transition relative ${
-              activeTab === "projects"
-                ? "text-amber-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-amber-400"
-                : "text-gray-400 hover:text-white"
-            }`}
+            className={`px-6 py-3 font-medium transition relative ${activeTab === "projects" ? "text-amber-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-amber-400" : "text-gray-400 hover:text-white"}`}
           >
             Projects
           </button>
           <button
             onClick={() => setActiveTab("activity")}
-            className={`px-6 py-3 font-medium transition relative ${
-              activeTab === "activity"
-                ? "text-amber-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-amber-400"
-                : "text-gray-400 hover:text-white"
-            }`}
+            className={`px-6 py-3 font-medium transition relative ${activeTab === "activity" ? "text-amber-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-amber-400" : "text-gray-400 hover:text-white"}`}
           >
             Activity
           </button>
@@ -692,19 +758,15 @@ function UserProfile() {
 
         {/* Tab Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content Area */}
           <div className="lg:col-span-2 space-y-6">
             {activeTab === "about" && (
               <>
-                {/* Bio */}
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h2 className="text-xl font-bold mb-4">About</h2>
                   <p className="text-gray-300 leading-relaxed">
                     {profile.info.bio || "This user hasn't added a bio yet."}
                   </p>
                 </div>
-
-                {/* Instruments */}
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <Music className="h-5 w-5 text-amber-400" />
@@ -727,8 +789,6 @@ function UserProfile() {
                     </p>
                   )}
                 </div>
-
-                {/* Genres */}
                 <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                   <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <Tag className="h-5 w-5 text-amber-400" />
@@ -755,7 +815,6 @@ function UserProfile() {
             {activeTab === "projects" && (
               <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                 <h2 className="text-xl font-bold mb-4">Projects</h2>
-
                 {loadingProjects ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-500"></div>
@@ -777,13 +836,7 @@ function UserProfile() {
                               {project.name}
                             </h3>
                             <span
-                              className={`px-3 py-1 rounded-full text-xs capitalize ${
-                                project.status === "active"
-                                  ? "bg-green-900/30 text-green-400"
-                                  : project.status === "recruiting"
-                                    ? "bg-blue-900/30 text-blue-400"
-                                    : "bg-yellow-900/30 text-yellow-400"
-                              }`}
+                              className={`px-3 py-1 rounded-full text-xs capitalize ${project.status === "active" ? "bg-green-900/30 text-green-400" : project.status === "recruiting" ? "bg-blue-900/30 text-blue-400" : "bg-yellow-900/30 text-yellow-400"}`}
                             >
                               {project.status}
                             </span>
@@ -827,10 +880,8 @@ function UserProfile() {
             {activeTab === "activity" && (
               <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
                 <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
-
                 {userProjects.length > 0 || audioFiles.length > 0 ? (
                   <div className="space-y-3">
-                    {/* Projects created */}
                     {userProjects.map((project) => (
                       <div
                         key={`project-${project.id}`}
@@ -859,13 +910,7 @@ function UserProfile() {
                           </p>
                           <div className="flex items-center gap-3 mt-2">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-xs capitalize ${
-                                project.status === "active"
-                                  ? "bg-green-900/30 text-green-400"
-                                  : project.status === "recruiting"
-                                    ? "bg-blue-900/30 text-blue-400"
-                                    : "bg-yellow-900/30 text-yellow-400"
-                              }`}
+                              className={`px-2 py-0.5 rounded-full text-xs capitalize ${project.status === "active" ? "bg-green-900/30 text-green-400" : project.status === "recruiting" ? "bg-blue-900/30 text-blue-400" : "bg-yellow-900/30 text-yellow-400"}`}
                             >
                               {project.status}
                             </span>
@@ -881,8 +926,6 @@ function UserProfile() {
                         </div>
                       </div>
                     ))}
-
-                    {/* Audio uploaded */}
                     {audioFiles.map((file) => (
                       <div
                         key={`audio-${file.uuid}`}
@@ -917,11 +960,13 @@ function UserProfile() {
                           >
                             {currentlyPlaying === file.uuid ? (
                               <>
-                                <Pause className="h-3 w-3" /> Pause
+                                <Pause className="h-3 w-3" />
+                                Pause
                               </>
                             ) : (
                               <>
-                                <Play className="h-3 w-3" /> Play sample
+                                <Play className="h-3 w-3" />
+                                Play sample
                               </>
                             )}
                           </button>
@@ -941,7 +986,6 @@ function UserProfile() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Contact Info */}
             <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
               <h3 className="font-bold text-lg mb-4">Contact</h3>
               <div className="space-y-4">
@@ -963,7 +1007,6 @@ function UserProfile() {
               </div>
             </div>
 
-            {/* Audio Samples */}
             <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                 <Headphones className="h-5 w-5 text-amber-400" />
@@ -974,7 +1017,6 @@ function UserProfile() {
                   </span>
                 )}
               </h3>
-
               {loadingAudio ? (
                 <div className="flex justify-center py-4">
                   <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-amber-500"></div>
@@ -1005,11 +1047,7 @@ function UserProfile() {
                         </div>
                         <button
                           onClick={() => handlePlayAudio(file.uuid)}
-                          className={`ml-3 p-2 rounded-full transition flex-shrink-0 ${
-                            currentlyPlaying === file.uuid
-                              ? "bg-amber-600 text-white"
-                              : "bg-gray-700 hover:bg-gray-600 text-gray-300"
-                          }`}
+                          className={`ml-3 p-2 rounded-full transition flex-shrink-0 ${currentlyPlaying === file.uuid ? "bg-amber-600 text-white" : "bg-gray-700 hover:bg-gray-600 text-gray-300"}`}
                           title={
                             currentlyPlaying === file.uuid ? "Pause" : "Play"
                           }
@@ -1044,10 +1082,8 @@ function UserProfile() {
               )}
             </div>
 
-            {/* Similar Musicians */}
             <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
               <h3 className="font-bold text-lg mb-4">Similar Musicians</h3>
-
               {loadingSimilar ? (
                 <div className="flex justify-center py-4">
                   <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-amber-500"></div>
@@ -1091,6 +1127,7 @@ function UserProfile() {
           </div>
         </div>
       </div>
+
       {/* Report Modal */}
       {showReportModal && profile && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
@@ -1101,14 +1138,12 @@ function UserProfile() {
               </div>
               <h2 className="text-2xl font-bold">Report User</h2>
             </div>
-
             <p className="text-gray-400 mb-4">
               You are reporting{" "}
               <span className="font-semibold text-white">
                 {profile.info.displayName}
               </span>
             </p>
-
             <div className="mb-6">
               <label className="block text-sm font-medium mb-2">
                 Reason for report *
@@ -1125,7 +1160,6 @@ function UserProfile() {
                 {reportReason.length}/500
               </p>
             </div>
-
             <div className="flex gap-3">
               <button
                 onClick={() => {

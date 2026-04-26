@@ -1241,9 +1241,8 @@ function ProfileCreation() {
       <footer className="mt-20 border-t border-gray-800 py-8">
         <div className="container mx-auto px-6 text-center text-amber-400">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <Music className="h-6 w-6 text-amber-500" />
-              <span className="text-xl font-bold">Resonance</span>
+            <div className="mb-4 md:mb-0">
+              <img src="/logo-full.png" alt="Resonance" className="h-10" />
             </div>
             <div className="text-sm">
               © 2026 Resonance Team • UNCP Music Department

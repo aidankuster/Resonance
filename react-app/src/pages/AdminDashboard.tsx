@@ -82,10 +82,25 @@ function AdminDashboard() {
   const [announcementSubject, setAnnouncementSubject] = useState("");
   const [announcementContent, setAnnouncementContent] = useState("");
 
+  const [navProfile, setNavProfile] = useState({ name: "", instruments: "" });
+
   // Tabs
   const [activeAdminTab, setActiveAdminTab] = useState<
     "users" | "reports" | "announcements"
   >("users");
+
+  // Load admin profile for nav bar
+  useEffect(() => {
+    if (user) {
+      setNavProfile({
+        name: user.info?.displayName || "Admin",
+        instruments:
+          user.instruments?.length > 0
+            ? user.instruments.join(", ")
+            : "Administrator",
+      });
+    }
+  }, [user]);
 
   useEffect(() => {
     const checkAdminAndLoadData = async () => {
@@ -394,24 +409,61 @@ function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white">
       <header className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+          {/* Logo - Left */}
           <Link
             to="/dashboard"
             className="flex items-center hover:opacity-80 transition"
           >
             <img src="/logo-full.png" alt="Resonance" className="h-10" />
           </Link>
-          <div className="flex items-center gap-4">
+
+          {/* Center - Admin Mode badge */}
+          <div className="flex-1 flex justify-center">
             <span className="bg-purple-900/30 text-purple-400 px-3 py-1 rounded-full text-sm border border-purple-800/30 flex items-center gap-1">
               <Shield className="h-4 w-4" />
               Admin Mode
             </span>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="text-gray-400 hover:text-white flex items-center gap-2"
-            >
-              <Home className="h-5 w-5" />
-              Dashboard
-            </button>
+          </div>
+
+          {/* Right Side - User Name, Instruments, Profile Picture */}
+          <div className="flex items-center space-x-3">
+            {user && (
+              <>
+                <div className="text-right">
+                  <p className="font-semibold">
+                    {user.info?.displayName || "Admin"}
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    {user.instruments && user.instruments.length > 0
+                      ? (user.instruments as any).join(", ")
+                      : "Administrator"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => user?.id && navigate(`/profile/${user.id}`)}
+                  className="relative cursor-pointer"
+                >
+                  <div className="h-10 w-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center overflow-hidden">
+                    <img
+                      src={profileAPI.getProfilePictureUrl(user.id)}
+                      alt={user.info?.displayName || "Admin"}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const icon = document.createElement("div");
+                          icon.innerHTML =
+                            '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                          parent.appendChild(icon.firstChild!);
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>

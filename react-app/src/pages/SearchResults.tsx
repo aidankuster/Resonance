@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
 import {
   Music,
   Search,
-  Bell,
   User,
   Eye,
   Heart,
@@ -105,12 +104,11 @@ function SearchResults() {
           setLoadingUser(false);
           return;
         }
-
         const profile = await profileAPI.getCurrentUserProfile(user.id);
         setCurrentUser({
           name: profile.info.displayName,
           instrument:
-            profile.instruments && profile.instruments.length > 0
+            profile.instruments?.length > 0
               ? profile.instruments.join(", ")
               : "Musician",
         });
@@ -120,7 +118,6 @@ function SearchResults() {
         setLoadingUser(false);
       }
     };
-
     loadCurrentUser();
   }, [user]);
 
@@ -168,20 +165,16 @@ function SearchResults() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+    if (searchQuery.trim())
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
   };
 
   const handleApplyFilters = () => {
     setShowFilters(false);
     performSearch();
   };
-
   const clearFilters = () => {
-    setFilters({
-      instrument: "",
-      genre: "",
-      experienceLevel: "",
-    });
+    setFilters({ instrument: "", genre: "", experienceLevel: "" });
     setTimeout(() => performSearch(), 0);
   };
 
@@ -206,10 +199,15 @@ function SearchResults() {
       {/* Top Navigation */}
       <header className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center">
+          {/* Logo - Left - Links to Dashboard */}
+          <Link
+            to="/dashboard"
+            className="flex items-center hover:opacity-80 transition"
+          >
             <img src="/logo-full.png" alt="Resonance" className="h-10" />
-          </div>
+          </Link>
 
+          {/* Search Bar - Center */}
           <div className="flex-1 max-w-2xl mx-8">
             <form onSubmit={handleSearch} className="relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -223,25 +221,38 @@ function SearchResults() {
             </form>
           </div>
 
-          <div className="flex items-center space-x-6">
-            <button className="relative p-2 hover:bg-gray-800 rounded-full transition">
-              <Bell className="h-6 w-6" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-            </button>
-
+          {/* Right Side - Name, Instruments, Profile Picture */}
+          <div className="flex items-center space-x-3">
+            <div className="text-right">
+              <p className="font-semibold">{currentUser.name || "User"}</p>
+              <p className="text-sm text-gray-400">
+                {currentUser.instrument || "Musician"}
+              </p>
+            </div>
             <button
-              onClick={() => navigate("/dashboard")}
-              className="flex items-center space-x-3"
+              onClick={() => user?.id && navigate(`/profile/${user.id}`)}
+              className="relative cursor-pointer"
             >
-              <div className="text-right">
-                <p className="font-semibold">{currentUser.name || "User"}</p>
-                <p className="text-sm text-gray-400">
-                  {currentUser.instrument || "Musician"}
-                </p>
+              <div className="h-10 w-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center overflow-hidden">
+                {user && (
+                  <img
+                    src={profileAPI.getProfilePictureUrl(user.id)}
+                    alt={currentUser.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        const icon = document.createElement("div");
+                        icon.innerHTML =
+                          '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                        parent.appendChild(icon.firstChild!);
+                      }
+                    }}
+                  />
+                )}
               </div>
-              <div className="h-10 w-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center">
-                <User className="h-6 w-6" />
-              </div>
+              <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
             </button>
           </div>
         </div>
@@ -264,11 +275,7 @@ function SearchResults() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full transition ${
-                showFilters || activeFilterCount > 0
-                  ? "bg-amber-600 text-white"
-                  : "bg-gray-800 hover:bg-gray-700"
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full transition ${showFilters || activeFilterCount > 0 ? "bg-amber-600 text-white" : "bg-gray-800 hover:bg-gray-700"}`}
             >
               <SlidersHorizontal className="h-4 w-4" />
               Filters
@@ -288,33 +295,21 @@ function SearchResults() {
         <div className="flex gap-2 mb-6 border-b border-gray-800">
           <button
             onClick={() => setSearchType("all")}
-            className={`px-4 py-2 font-medium transition flex items-center gap-2 ${
-              searchType === "all"
-                ? "text-amber-400 border-b-2 border-amber-400"
-                : "text-gray-400 hover:text-white"
-            }`}
+            className={`px-4 py-2 font-medium transition flex items-center gap-2 ${searchType === "all" ? "text-amber-400 border-b-2 border-amber-400" : "text-gray-400 hover:text-white"}`}
           >
             <Search className="h-4 w-4" />
             All
           </button>
           <button
             onClick={() => setSearchType("users")}
-            className={`px-4 py-2 font-medium transition flex items-center gap-2 ${
-              searchType === "users"
-                ? "text-amber-400 border-b-2 border-amber-400"
-                : "text-gray-400 hover:text-white"
-            }`}
+            className={`px-4 py-2 font-medium transition flex items-center gap-2 ${searchType === "users" ? "text-amber-400 border-b-2 border-amber-400" : "text-gray-400 hover:text-white"}`}
           >
             <Users className="h-4 w-4" />
             Musicians
           </button>
           <button
             onClick={() => setSearchType("projects")}
-            className={`px-4 py-2 font-medium transition flex items-center gap-2 ${
-              searchType === "projects"
-                ? "text-amber-400 border-b-2 border-amber-400"
-                : "text-gray-400 hover:text-white"
-            }`}
+            className={`px-4 py-2 font-medium transition flex items-center gap-2 ${searchType === "projects" ? "text-amber-400 border-b-2 border-amber-400" : "text-gray-400 hover:text-white"}`}
           >
             <FolderOpen className="h-4 w-4" />
             Projects
@@ -335,8 +330,6 @@ function SearchResults() {
                     Clear all
                   </button>
                 </div>
-
-                {/* Instrument Filter */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium mb-2">
                     Instrument
@@ -358,8 +351,6 @@ function SearchResults() {
                     ))}
                   </select>
                 </div>
-
-                {/* Genre Filter */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium mb-2">
                     Genre
@@ -381,8 +372,6 @@ function SearchResults() {
                     ))}
                   </select>
                 </div>
-
-                {/* Experience Level Filter - Only show for user search */}
                 {(searchType === "all" || searchType === "users") && (
                   <div className="mb-6">
                     <label className="block text-sm font-medium mb-2">
@@ -409,7 +398,6 @@ function SearchResults() {
                     </select>
                   </div>
                 )}
-
                 <button
                   onClick={handleApplyFilters}
                   className="w-full bg-amber-600 hover:bg-amber-700 py-3 rounded-xl font-medium transition"
@@ -428,7 +416,6 @@ function SearchResults() {
               </div>
             ) : (
               <>
-                {/* User Results */}
                 {(searchType === "all" || searchType === "users") &&
                   userResults.length > 0 && (
                     <>
@@ -465,11 +452,9 @@ function SearchResults() {
                                 </div>
                               )}
                             </div>
-
                             <p className="text-gray-300 text-sm mb-3 line-clamp-2">
                               {musician.bio}
                             </p>
-
                             <div className="flex flex-wrap gap-2 mb-4">
                               {musician.genres.slice(0, 3).map((genre, idx) => (
                                 <span
@@ -485,18 +470,14 @@ function SearchResults() {
                                 </span>
                               )}
                             </div>
-
                             <div className="flex items-center justify-between pt-4 border-t border-gray-800">
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs text-gray-500 capitalize">
-                                  {musician.experienceLevel.toLowerCase()}
-                                </span>
-                              </div>
+                              <span className="text-xs text-gray-500 capitalize">
+                                {musician.experienceLevel.toLowerCase()}
+                              </span>
                               <div className="flex gap-2">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    console.log("Save", musician.id);
                                   }}
                                   className="p-2 hover:bg-gray-800 rounded-full transition"
                                 >
@@ -505,7 +486,6 @@ function SearchResults() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    console.log("View", musician.id);
                                   }}
                                   className="p-2 hover:bg-gray-800 rounded-full transition"
                                 >
@@ -519,7 +499,6 @@ function SearchResults() {
                     </>
                   )}
 
-                {/* Project Results */}
                 {(searchType === "all" || searchType === "projects") &&
                   projectResults.length > 0 && (
                     <>
@@ -556,11 +535,9 @@ function SearchResults() {
                                 </div>
                               )}
                             </div>
-
                             <p className="text-gray-300 text-sm mb-3 line-clamp-2">
                               {project.description}
                             </p>
-
                             <div className="flex flex-wrap gap-2 mb-4">
                               {project.neededInstruments
                                 .slice(0, 3)
@@ -578,7 +555,6 @@ function SearchResults() {
                                 </span>
                               )}
                             </div>
-
                             <div className="flex items-center justify-between pt-4 border-t border-gray-800">
                               <div className="flex items-center gap-3">
                                 <span
@@ -606,7 +582,6 @@ function SearchResults() {
                     </>
                   )}
 
-                {/* No Results State */}
                 {!loading && totalResults === 0 && (
                   <div className="text-center py-20">
                     <div className="bg-gray-900/30 rounded-2xl p-12 max-w-md mx-auto">

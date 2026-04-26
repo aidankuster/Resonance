@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
+import { profileAPI } from "../services/api";
 import {
   Music,
-  ChevronLeft,
   Users,
   Plus,
   X,
@@ -45,7 +45,7 @@ function ProjectCreation() {
   const [projectData, setProjectData] = useState({
     projectName: "",
     description: "",
-    status: "recruiting" as "active" | "planning" | "recruiting",
+    status: "planning" as "active" | "planning" | "recruiting",
     memberCount: 1, // Founder counts as 1
   });
 
@@ -255,16 +255,54 @@ function ProjectCreation() {
     <div className="min-h-screen bg-gradient-to-b from-amber-950 to-black text-white">
       {/* Navigation */}
       <nav className="container mx-auto px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <img src="/logo-full.png" alt="Resonance" className="h-10" />
-        </div>
-        <button
-          onClick={() => navigate("/dashboard")}
-          className="text-gray-400 hover:text-white flex items-center gap-2"
+        {/* Logo - Left - Links to Dashboard */}
+        <Link
+          to="/dashboard"
+          className="flex items-center hover:opacity-80 transition"
         >
-          <ChevronLeft className="h-5 w-5" />
-          Back to Dashboard
-        </button>
+          <img src="/logo-full.png" alt="Resonance" className="h-10" />
+        </Link>
+
+        {/* Right Side - User Name, Instruments, Profile Picture */}
+        <div className="flex items-center space-x-3">
+          {user && (
+            <>
+              <div className="text-right">
+                <p className="font-semibold">
+                  {user.info?.displayName || "User"}
+                </p>
+                <p className="text-sm text-gray-400">
+                  {user.instruments && user.instruments.length > 0
+                    ? user.instruments.join(", ")
+                    : "Musician"}
+                </p>
+              </div>
+              <button
+                onClick={() => user?.id && navigate(`/profile/${user.id}`)}
+                className="relative cursor-pointer"
+              >
+                <div className="h-10 w-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-full flex items-center justify-center overflow-hidden">
+                  <img
+                    src={profileAPI.getProfilePictureUrl(user.id)}
+                    alt={user.info?.displayName || "User"}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        const icon = document.createElement("div");
+                        icon.innerHTML =
+                          '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                        parent.appendChild(icon.firstChild!);
+                      }
+                    }}
+                  />
+                </div>
+                <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
+              </button>
+            </>
+          )}
+        </div>
       </nav>
 
       {/* Main Content */}
@@ -345,8 +383,8 @@ function ProjectCreation() {
                     }
                     className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500"
                   >
-                    <option value="recruiting">Recruiting</option>
                     <option value="planning">Planning</option>
+                    <option value="recruiting">Recruiting</option>
                     <option value="active">Active</option>
                   </select>
                 </div>
@@ -593,8 +631,7 @@ function ProjectCreation() {
         <div className="container mx-auto px-6 text-center text-amber-400">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <Music className="h-6 w-6 text-amber-500" />
-              <span className="text-xl font-bold">Resonance</span>
+              <img src="/logo-full.png" alt="Resonance" className="h-10" />
             </div>
             <div className="text-sm">
               © 2026 Resonance Team • UNCP Music Department

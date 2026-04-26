@@ -696,13 +696,6 @@ function Dashboard() {
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Discover Musicians</h2>
                   <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => navigate("/search")}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition"
-                    >
-                      <Filter className="h-4 w-4" />
-                      Filters
-                    </button>
                     <div className="text-sm text-gray-400">
                       Showing {suggestedMusicians.length} matches for you
                     </div>
