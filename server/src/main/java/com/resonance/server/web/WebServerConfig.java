@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit;
 public class WebServerConfig {
 	
 	public int port = 80;
-	public boolean secureCookies = true;
+	public boolean secureCookies = false;
 	
 	public JwtConfig jwt = new JwtConfig();
 	

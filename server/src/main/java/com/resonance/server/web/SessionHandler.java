@@ -125,7 +125,7 @@ public class SessionHandler {
 				token,
 				"/",
 				(int) this.defaultExpiryDuration / 1000, //convert to seconds
-				false,
+				Server.INSTANCE.getWebServer().getConfig().secureCookies,
 				0,
 				true,
 				null,
