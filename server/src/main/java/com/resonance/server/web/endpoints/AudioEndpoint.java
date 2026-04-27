@@ -50,7 +50,7 @@ public class AudioEndpoint implements EndpointGroup {
 			delete(this::handleAudioDelete);
 		});
 
-		// Get all audio files for current user
+		// Get audio files (current user by default, or specific uploader via query param)
 		get("/api/audio", this::handleGetUserAudioFiles);
 	}
 
@@ -149,10 +149,15 @@ public class AudioEndpoint implements EndpointGroup {
 
 	private void handleGetUserAudioFiles(@NotNull Context ctx) {
 		final UserAccount sessionAccount = Server.INSTANCE.getWebServer().getSessionHandler().validateSession(ctx);
+		
+		int uploaderId = ctx.queryParamAsClass("uploaderId", Integer.class).getOrDefault(-1);
+		if (uploaderId == -1) {
+			uploaderId = sessionAccount.id();
+		}
 
-		// Get all audio files for this user
+		// Get all audio files for target uploader
 		final var audioFiles = Server.INSTANCE.getDatabaseManager()
-				.getAudioFilesByUploader(sessionAccount.id())
+				.getAudioFilesByUploader(uploaderId)
 				.collectList()
 				.block();
 

@@ -337,8 +337,11 @@ export const audioAPI = {
     return data;
   },
 
-  // Get all audio files for current user
-  getUserAudioFiles: async (): Promise<AudioFileResponse[]> => {
+  // Get audio files for current user, or for a specific uploader
+  getUserAudioFiles: async (uploaderId?: number): Promise<AudioFileResponse[]> => {
+    if (typeof uploaderId === 'number') {
+      return fetchAPI<AudioFileResponse[]>(`/api/audio?uploaderId=${encodeURIComponent(String(uploaderId))}`);
+    }
     return fetchAPI<AudioFileResponse[]>('/api/audio');
   },
 

@@ -241,17 +241,8 @@ function UserProfile() {
   const loadAudioFiles = async (userId: number) => {
     setLoadingAudio(true);
     try {
-      if (isOwnProfile) {
-        const files = await audioAPI.getUserAudioFiles();
-        setAudioFiles(files);
-      } else {
-        try {
-          const files = await audioAPI.getUserAudioFiles();
-          setAudioFiles(files.filter((f: any) => f.uploaderId === userId));
-        } catch {
-          setAudioFiles([]);
-        }
-      }
+      const files = await audioAPI.getUserAudioFiles(userId);
+      setAudioFiles(files);
     } catch (error) {
       console.error("Failed to load audio files:", error);
       setAudioFiles([]);
