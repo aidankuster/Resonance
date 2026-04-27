@@ -29,15 +29,7 @@ public class SearchEndpoint implements EndpointGroup {
         String instrument = ctx.queryParam("instrument");
         String genre = ctx.queryParam("genre");
         String experienceLevel = ctx.queryParam("experienceLevel");
-
-        System.out.println("\n🔍 ========== SEARCH REQUEST ==========");
-        System.out.println("📝 Query: '" + query + "'");
-        System.out.println("📁 Type: '" + type + "'");
-        System.out.println("🎸 Instrument: " + instrument);
-        System.out.println("🎵 Genre: " + genre);
-        System.out.println("📊 Experience Level: " + experienceLevel);
-        System.out.println("=====================================\n");
-
+        
         Map<String, Object> results = new HashMap<>();
 
         // Search users
