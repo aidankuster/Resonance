@@ -1,4 +1,4 @@
-package com.resonance.server.web.endpoints.session;
+package com.resonance.server.web.endpoints;
 
 import com.google.gson.JsonArray;
 import com.resonance.server.Server;

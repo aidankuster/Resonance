@@ -1,4 +1,4 @@
-package com.resonance.server.web.endpoints.session;
+package com.resonance.server.web.endpoints;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -18,7 +18,7 @@ import static io.javalin.apibuilder.ApiBuilder.*;
 /**
  * Admin-only endpoints for platform management
  * 
- * @author John 4/13/2026
+ * @author Aidan 4/13/2026
  */
 public class AdminEndpoint implements EndpointGroup {
 
